@@ -379,8 +379,9 @@ module riscv_pipeline #(
     logic            alu_zero_unused;
     assign alu_a = ex_use_pc ? ex_pc : fwd_a;
     assign alu_b = ex_alu_src_imm ? ex_imm_alu : fwd_b;
-    // pipeline ALU has no divide hardware; DIV/REM go to the sequential unit
-    alu #(.XLEN(XLEN), .HAS_DIV(1'b0)) u_alu (
+    // pipeline ALU has no multiply/divide hardware; M-ext goes to the sequential
+    // units below (smaller area, shorter critical path, tractable std-cell map).
+    alu #(.XLEN(XLEN), .HAS_DIV(1'b0), .HAS_MUL(1'b0)) u_alu (
         .op(ex_alu_op), .a(alu_a), .b(alu_b), .y(alu_y), .zero(alu_zero_unused)
     );
 
@@ -393,8 +394,7 @@ module riscv_pipeline #(
     logic            div_busy, div_done;
     logic [XLEN-1:0] div_result;
     wire             div_start = ex_is_div && !div_busy && !div_done;
-    // hold the whole front-end while a divide is in flight
-    assign           div_stall = ex_is_div && !div_done;
+    wire             div_stall_w = ex_is_div && !div_done;
 
     divider #(.XLEN(XLEN)) u_div (
         .clk, .rst_n,
@@ -403,9 +403,34 @@ module riscv_pipeline #(
         .busy(div_busy), .done(div_done), .result(div_result)
     );
 
-    // EX result feeding EX/MEM: CSR read for CSR ops, divide result for DIV/REM,
-    // else the ALU (csr_rdata declared in the CSR block below).
-    wire [XLEN-1:0] ex_result = ex_is_csr ? csr_rdata : (div_op ? div_result : alu_y);
+    // ---- multi-cycle multiplier (MUL/MULH/MULHSU/MULHU) ---------------------
+    wire mul_op    = (ex_alu_op == `ALU_MUL)  || (ex_alu_op == `ALU_MULH) ||
+                     (ex_alu_op == `ALU_MULHSU) || (ex_alu_op == `ALU_MULHU);
+    wire ex_is_mul = ex_valid && mul_op;
+    wire mul_a_signed = (ex_alu_op == `ALU_MUL) || (ex_alu_op == `ALU_MULH) ||
+                        (ex_alu_op == `ALU_MULHSU);
+    wire mul_b_signed = (ex_alu_op == `ALU_MUL) || (ex_alu_op == `ALU_MULH);
+    wire mul_sel_high = (ex_alu_op != `ALU_MUL);     // MUL=low half, MULH*=high
+    logic            mul_busy, mul_done;
+    logic [XLEN-1:0] mul_result;
+    wire             mul_start = ex_is_mul && !mul_busy && !mul_done;
+    wire             mul_stall_w = ex_is_mul && !mul_done;
+
+    mul_seq #(.XLEN(XLEN)) u_mul (
+        .clk, .rst_n,
+        .start(mul_start), .a_is_signed(mul_a_signed), .b_is_signed(mul_b_signed),
+        .sel_high(mul_sel_high), .a(fwd_a), .b(fwd_b),
+        .busy(mul_busy), .done(mul_done), .result(mul_result)
+    );
+
+    // any multi-cycle EX unit in flight freezes the front-end + holds EX
+    assign div_stall = div_stall_w || mul_stall_w;
+
+    // EX result feeding EX/MEM: CSR read, else multiply/divide result, else ALU
+    // (csr_rdata declared in the CSR block below).
+    wire [XLEN-1:0] ex_result = ex_is_csr ? csr_rdata :
+                                mul_op    ? mul_result :
+                                div_op    ? div_result : alu_y;
 
     // branch resolution (uses forwarded operands)
     logic eq, lt, ltu, take_branch;

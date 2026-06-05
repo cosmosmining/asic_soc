@@ -20,7 +20,7 @@ COMMON   := rtl/common
 RTL_CORE := rtl/cpu_riscv/regfile.sv rtl/cpu_riscv/csr.sv rtl/cpu_riscv/alu.sv \
             rtl/cpu_riscv/riscv_core.sv
 RTL_PIPE := rtl/cpu_riscv/regfile.sv rtl/cpu_riscv/csr.sv rtl/cpu_riscv/alu.sv \
-            rtl/cpu_riscv/divider.sv rtl/cpu_riscv/riscv_pipeline.sv
+            rtl/cpu_riscv/divider.sv rtl/cpu_riscv/mul_seq.sv rtl/cpu_riscv/riscv_pipeline.sv
 
 # --- tools -----------------------------------------------------------------
 IVERILOG := iverilog
