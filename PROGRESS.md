@@ -150,6 +150,46 @@ a clean, verified win; either is a good next step.)
 
 ---
 
+## Iteration 5 — physical synthesis against the real sky130 PDK
+
+**Goal (user priority #1, "is it ready to fab?"):** push past generic synthesis to
+a real foundry library and report honest physical numbers.
+
+**Changed / done**
+- Fetched the actual **SkyWater sky130** PDK (`volare`), mapped `riscv_pipeline`
+  onto `sky130_fd_sc_hd` standard cells (`tools/scripts/synth_sky130.sh`).
+- Added OpenLane config (`tools/openlane/config.json`) + `gds_flow/README.md` with
+  the exact steps to produce a routed GDSII on a Docker host.
+
+**Result (real PDK):** **27,017 std cells, 234,751 µm² (≈0.235 mm²)** for the
+pipeline. Mapped netlist written.
+
+**Honest status:** RTL is functionally verified + maps to the real sky130 library
+with area numbers — a solid *pre-physical* milestone. It is **not** fab-ready:
+routed GDSII (OpenROAD/OpenLane, needs Docker — unavailable locally), DRC/LVS, and
+timing signoff are still required. See `gds_flow/README.md`.
+
+**Bottleneck made concrete:** the **combinational 32-bit divider** dominates area
+and makes ABC mapping take minutes — exactly the unit to convert to multi-cycle.
+
+## Iteration 6 — UVM verification environment
+
+**Goal (user priority #2, "use UVM, as pro as possible"):** package the proven
+checking in an industry-standard UVM TB.
+
+**Changed:** `tb/uvm/` — `riscv_if.sv`, `riscv_uvm_pkg.sv` (program seq-item +
+constrained-random stream, sequencer, driver w/ backdoor load, monitor on RVFI,
+scoreboard with an **independent reference ISS + functional covergroup**, agent,
+env, `riscv_random_test`), `tb_uvm_top.sv`, README.
+
+**Honest status:** UVM needs a commercial simulator / EDA Playground; the
+open-source Icarus/Verilator flow here **cannot run UVM**, so this env is **not
+locally compile-checked**. Its scoreboard reference is the *same algorithm* as the
+golden model that the local Icarus differential test proves over ~260 programs —
+so the logic is sound; the UVM wrapper is for VCS/Questa/Xcelium.
+
+---
+
 ## Backlog (ordered)
 0. ~~Branch prediction (BTB + 2-bit BHT)~~ ✅ (Iteration 4)
 1. ~~Golden-trace co-sim harness~~ ✅ (Iteration 2)
