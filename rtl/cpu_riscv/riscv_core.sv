@@ -74,7 +74,7 @@ module riscv_core #(
     logic        branch;
     logic        jump;          // JAL/JALR (unconditional)
     logic        jalr;
-    logic [3:0]  alu_op;
+    logic [4:0]  alu_op;
     logic [1:0]  wb_sel;        // 0=alu, 1=mem, 2=pc+4, 3=imm_u(LUI)
     logic [XLEN-1:0] alu_b_imm; // selected immediate for ALU
 
@@ -101,7 +101,10 @@ module riscv_core #(
                         3'b001: alu_op = `ALU_MULH;
                         3'b010: alu_op = `ALU_MULHSU;
                         3'b011: alu_op = `ALU_MULHU;
-                        // DIV/REM not yet implemented -> treated as ADD (placeholder)
+                        3'b100: alu_op = `ALU_DIV;
+                        3'b101: alu_op = `ALU_DIVU;
+                        3'b110: alu_op = `ALU_REM;
+                        3'b111: alu_op = `ALU_REMU;
                         default: alu_op = `ALU_ADD;
                     endcase
                 end else begin

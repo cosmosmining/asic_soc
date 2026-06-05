@@ -31,5 +31,9 @@
 `define ALU_MULHSU 4'd12
 `define ALU_MULHU  4'd13
 `define ALU_PASSB  4'd14  // pass operand B (for LUI)
+`define ALU_DIV    5'd15
+`define ALU_DIVU   5'd16
+`define ALU_REM    5'd17
+`define ALU_REMU   5'd18
 
 `endif

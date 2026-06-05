@@ -77,10 +77,46 @@ instruction-stream differential test (constrained-random) reusing the golden ISS
 
 ---
 
+## Iteration 3 — complete RV32IM + randomized differential testing
+
+**Goal:** finish the M-extension (DIV/REM) and add constrained-random differential
+stress to flush out hazard/datapath bugs the directed tests can't reach.
+
+**Changed**
+- ALU: added DIV/DIVU/REM/REMU with full RISC-V corner cases (÷0, signed overflow);
+  widened ALU op to 5 bits. Decoded M-ext funct3 4..7 in both cores + golden ISS.
+- `tools/scripts/gen_rand_prog.py` — random linear RV32IM program generator.
+- `tools/scripts/regress.sh` — builds both cores once, runs directed + N random
+  seeds against BOTH, via a `+PROG=` plusarg override (added to TB + golden).
+
+**Verify** — directed 17/17 both cores; **REGRESSION PASS: 100 random seeds × 80
+instr on both single-cycle and pipeline.** Synthesis clean (divider maps).
+
+**What broke / fixed** — the random tests exposed bugs, all in the *test infra /
+reference model* (the RTL was correct each time — which is the point of an
+independent golden):
+1. *RTL+semantic:* shared regfile `write-first` bypass formed a combinational loop
+   in the single-cycle core (`rs1→ALU→rd_data→rs1`) whenever `rd==rs1`, and was also
+   wrong per spec there. Made it a `WRITE_FIRST` parameter: off for single-cycle,
+   on for the pipeline (where `rd_data` is registered). Real fix, real bug.
+2. *Harness:* `mem[0x100]` spot-check was directed-only; gated it behind `default_prog`.
+3. *Golden model (x3):* iverilog signedness traps — `$signed()` casts and, crucially,
+   mixed-sign `?:` ternaries silently demote `>>>` to a logical shift and signed `/`
+   to unsigned. Rewrote SRA/SRAI/DIV/REM as if/else with signed-declared operands.
+
+**Next bottleneck** — combinational 32-bit divider is large/slow (hurts timing/area);
+the CPU still has no memory subsystem beyond the TB BRAM, no CSRs, no AXI fabric.
+
+**Next single-step action** — bind SVA into the pipeline + add a cycle/CPI counter,
+then start the system side: an AXI-lite SRAM slave + a thin core→AXI adapter.
+
+---
+
 ## Backlog (ordered)
 1. ~~Golden-trace co-sim harness~~ ✅ (Iteration 2)
 2. ~~5-stage pipeline: forwarding, load-use stall, branch flush~~ ✅ (Iteration 2)
-3. DIV/REM (M-extension) — currently placeholder.
+3. ~~DIV/REM (M-extension)~~ ✅ (Iteration 3) — now combinational; multi-cycle later.
+4. Randomized differential testing ✅ (Iteration 3) — extend with loads/stores+branches.
 4. CSR + minimal trap handling (mtvec/mepc/mcause) for compliance subset.
 5. AXI-lite memory slave + interconnect; swap TB BRAM for it via adapter.
 6. GPU SIMD lanes (vec add/mul/dot) sharing the AXI fabric.

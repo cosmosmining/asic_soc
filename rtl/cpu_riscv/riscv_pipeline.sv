@@ -98,7 +98,7 @@ module riscv_pipeline #(
     logic        c_reg_write, c_alu_src_imm, c_mem_read, c_mem_write;
     logic        c_branch, c_jump, c_jalr, c_use_pc;
     logic        c_uses_rs1, c_uses_rs2;
-    logic [3:0]  c_alu_op;
+    logic [4:0]  c_alu_op;
     logic [1:0]  c_wb_sel;
     logic [XLEN-1:0] c_imm_alu;
 
@@ -119,6 +119,10 @@ module riscv_pipeline #(
                         3'b001: c_alu_op = `ALU_MULH;
                         3'b010: c_alu_op = `ALU_MULHSU;
                         3'b011: c_alu_op = `ALU_MULHU;
+                        3'b100: c_alu_op = `ALU_DIV;
+                        3'b101: c_alu_op = `ALU_DIVU;
+                        3'b110: c_alu_op = `ALU_REM;
+                        3'b111: c_alu_op = `ALU_REMU;
                         default: c_alu_op = `ALU_ADD;
                     endcase
                 end else begin
@@ -185,7 +189,7 @@ module riscv_pipeline #(
     logic [XLEN-1:0] rf_rs1, rf_rs2, wb_wdata;
     logic            wb_valid, wb_reg_write;
     logic [4:0]      wb_rd;
-    regfile #(.XLEN(XLEN)) u_rf (
+    regfile #(.XLEN(XLEN), .WRITE_FIRST(1'b1)) u_rf (
         .clk, .rst_n,
         .rs1_addr(de_rs1), .rs2_addr(de_rs2),
         .rs1_data(rf_rs1), .rs2_data(rf_rs2),
@@ -197,7 +201,7 @@ module riscv_pipeline #(
     logic [XLEN-1:0] ex_pc, ex_rs1_data, ex_rs2_data, ex_imm_alu, ex_imm_b, ex_imm_j;
     logic [4:0]      ex_rs1, ex_rs2, ex_rd;
     logic [2:0]      ex_funct3;
-    logic [3:0]      ex_alu_op;
+    logic [4:0]      ex_alu_op;
     logic [1:0]      ex_wb_sel;
     logic            ex_reg_write, ex_alu_src_imm, ex_mem_read, ex_mem_write;
     logic            ex_branch, ex_jump, ex_jalr, ex_use_pc;

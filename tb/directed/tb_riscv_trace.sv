@@ -59,9 +59,13 @@ module tb_riscv_trace;
     end
 
     integer i;
+    string  progfile;
+    bit     default_prog;
     initial begin
         for (i = 0; i < WORDS; i = i + 1) mem[i] = 32'h0;
-        $readmemh(PROG, mem);
+        default_prog = !$value$plusargs("PROG=%s", progfile);
+        if (default_prog) progfile = PROG;
+        $readmemh(progfile, mem);
     end
 
     // independent golden model (publishes gold.exp_* and gold.n_exp at t=0)
@@ -108,8 +112,8 @@ module tb_riscv_trace;
     function void report_and_finish();
         $display("=== golden-trace differential test (%s) ===", MODE);
         $display("retired %0d/%0d instructions", idx, gold.n_exp);
-        // architectural memory spot-check: store of x5(=74) at 0x100
-        if (mem[256>>2] !== 32'd74) begin
+        // architectural memory spot-check (directed program only): store x5(=74)@0x100
+        if (default_prog && mem[256>>2] !== 32'd74) begin
             errors++;
             $display("  MISMATCH mem[0x100] = 0x%08x (expected 0x4a)", mem[256>>2]);
         end

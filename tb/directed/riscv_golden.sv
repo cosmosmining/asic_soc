@@ -26,12 +26,16 @@ module riscv_golden #(
 
     initial begin : iss
         integer      i, step;
+        string       progfile;
         logic [31:0] pc, npc, inst;
         logic [6:0]  opc, f7;
         logic [4:0]  rd, rs1, rs2;
         logic [2:0]  f3;
         logic [31:0] a, b, imm_i, imm_s, imm_b, imm_u, imm_j;
         logic [31:0] addr, word, res;
+        logic signed [31:0] a_s, b_s;   // signed views (iverilog needs a real
+                                        // signed var, not a $signed() cast, for
+                                        // reliable >>> / signed compares)
         logic        we, taken;
         logic [1:0]  boff;
         logic signed [63:0] As, Bs, pss, psu;
@@ -39,7 +43,8 @@ module riscv_golden #(
 
         for (i = 0; i < WORDS; i = i + 1) gmem[i] = 32'h0;
         for (i = 0; i < 32;    i = i + 1) xreg[i] = 32'h0;
-        $readmemh(PROG, gmem);
+        if (!$value$plusargs("PROG=%s", progfile)) progfile = PROG;
+        $readmemh(progfile, gmem);
 
         pc    = RESET_PC;
         n_exp = 0;
@@ -61,6 +66,8 @@ module riscv_golden #(
 
             a = xreg[rs1];
             b = xreg[rs2];
+            a_s = a;
+            b_s = b;
 
             we    = 1'b0;
             res   = 32'h0;
@@ -76,8 +83,8 @@ module riscv_golden #(
                     case (f3)
                         3'b000: taken = (a == b);
                         3'b001: taken = (a != b);
-                        3'b100: taken = ($signed(a) <  $signed(b));
-                        3'b101: taken = ($signed(a) >= $signed(b));
+                        3'b100: taken = (a_s <  b_s);
+                        3'b101: taken = (a_s >= b_s);
                         3'b110: taken = (a <  b);
                         3'b111: taken = (a >= b);
                         default: taken = 1'b0;
@@ -114,14 +121,16 @@ module riscv_golden #(
                     we = 1'b1;
                     case (f3)
                         3'b000: res = a + imm_i;                              // ADDI
-                        3'b010: res = ($signed(a) < $signed(imm_i)) ? 32'd1 : 32'd0; // SLTI
+                        3'b010: res = (a_s < $signed(imm_i)) ? 32'd1 : 32'd0; // SLTI
                         3'b011: res = (a < imm_i) ? 32'd1 : 32'd0;            // SLTIU
                         3'b100: res = a ^ imm_i;                              // XORI
                         3'b110: res = a | imm_i;                              // ORI
                         3'b111: res = a & imm_i;                              // ANDI
                         3'b001: res = a << imm_i[4:0];                        // SLLI
-                        3'b101: res = f7[5] ? ($signed(a) >>> imm_i[4:0])     // SRAI
-                                            : (a >> imm_i[4:0]);              // SRLI
+                        // NB: split if/else (not a ?: ) so the arithmetic >>>
+                        // operand isn't demoted to unsigned by the other branch.
+                        3'b101: if (f7[5]) res = a_s >>> imm_i[4:0];          // SRAI
+                                else       res = a   >>  imm_i[4:0];          // SRLI
                         default: res = 32'h0;
                     endcase
                 end
@@ -136,17 +145,25 @@ module riscv_golden #(
                             3'b001: res = pss[63:32];       // MULH
                             3'b010: res = psu[63:32];       // MULHSU
                             3'b011: res = puu[63:32];       // MULHU
-                            default: res = 32'h0;           // DIV/REM TODO
+                            3'b100: if (b == 32'h0)                          res = 32'hFFFFFFFF;  // DIV
+                                    else if (a==32'h80000000 && b==32'hFFFFFFFF) res = 32'h80000000;
+                                    else                                        res = a_s / b_s;
+                            3'b101: res = (b == 32'h0) ? 32'hFFFFFFFF : (a / b);       // DIVU
+                            3'b110: if (b == 32'h0)                          res = a;             // REM
+                                    else if (a==32'h80000000 && b==32'hFFFFFFFF) res = 32'h0;
+                                    else                                        res = a_s % b_s;
+                            3'b111: res = (b == 32'h0) ? a : (a % b);                  // REMU
+                            default: res = 32'h0;
                         endcase
                     end else begin
                         case (f3)
                             3'b000: res = f7[5] ? (a - b) : (a + b);          // SUB/ADD
                             3'b001: res = a << b[4:0];                        // SLL
-                            3'b010: res = ($signed(a) < $signed(b)) ? 32'd1 : 32'd0; // SLT
+                            3'b010: res = (a_s < b_s) ? 32'd1 : 32'd0;        // SLT
                             3'b011: res = (a < b) ? 32'd1 : 32'd0;            // SLTU
                             3'b100: res = a ^ b;                              // XOR
-                            3'b101: res = f7[5] ? ($signed(a) >>> b[4:0])     // SRA
-                                                : (a >> b[4:0]);              // SRL
+                            3'b101: if (f7[5]) res = a_s >>> b[4:0];          // SRA
+                                    else       res = a   >>  b[4:0];          // SRL
                             3'b110: res = a | b;                             // OR
                             3'b111: res = a & b;                             // AND
                             default: res = 32'h0;
