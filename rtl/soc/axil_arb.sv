@@ -34,9 +34,6 @@ module axil_arb #(
     st_t state;
     logic sel;                         // granted master id (0 or 1)
 
-    wire m0_wants = m0_arvalid;                  // I$: reads only
-    wire m1_wants = m1_arvalid || m1_awvalid;    // D$: reads or writes
-
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             state <= FREE; sel <= 1'b0;

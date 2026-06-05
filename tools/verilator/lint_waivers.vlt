@@ -19,3 +19,15 @@ lint_off -rule UNUSEDSIGNAL -file "*/divider.sv" -match "*'rem'*"
 // csr.sv: mepc enforces IALIGN=32 by forcing bit 0 of the trapped PC to 0
 // ({trap_epc[XLEN-1:1],1'b0}); trap_epc[0] is intentionally dropped.
 lint_off -rule UNUSEDSIGNAL -file "*/csr.sv" -match "*'trap_epc'*"
+
+// riscv_cache.sv: addr[1:0] are byte-within-word bits (accesses are word
+// granular here); the AXI read/write response codes are assumed OKAY.
+lint_off -rule UNUSEDSIGNAL -file "*/riscv_cache.sv" -match "*'addr'*"
+lint_off -rule UNUSEDSIGNAL -file "*/riscv_cache.sv" -match "*'m_rresp'*"
+lint_off -rule UNUSEDSIGNAL -file "*/riscv_cache.sv" -match "*'m_bresp'*"
+
+// axil_arb.sv: master-0 is the I-cache (reads only); its write-channel inputs
+// are intentionally unused (the arbiter ties the m0 write path off).
+lint_off -rule UNUSEDSIGNAL -file "*/axil_arb.sv" -match "*'m0_aw*"
+lint_off -rule UNUSEDSIGNAL -file "*/axil_arb.sv" -match "*'m0_w*"
+lint_off -rule UNUSEDSIGNAL -file "*/axil_arb.sv" -match "*'m0_bready'*"

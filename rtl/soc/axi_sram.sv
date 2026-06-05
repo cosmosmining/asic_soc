@@ -38,8 +38,8 @@ module axi_sram #(
     localparam int WIDX = $clog2(WORDS);
     logic [DW-1:0] mem [0:WORDS-1];
 
-    wire [WIDX-1:0] w_index = (awaddr - BASE) >> 2;
-    wire [WIDX-1:0] r_index = (araddr - BASE) >> 2;
+    wire [WIDX-1:0] w_index = WIDX'((awaddr - BASE) >> 2);
+    wire [WIDX-1:0] r_index = WIDX'((araddr - BASE) >> 2);
 
     // ---------------- write channel: accept AW+W together, then respond ------
     typedef enum logic [1:0] {W_IDLE, W_RESP} wstate_t;
