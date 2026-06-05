@@ -18,11 +18,14 @@ module riscv_pipeline #(
     input  logic            rst_n,
     output logic [XLEN-1:0] imem_addr,
     input  logic [XLEN-1:0] imem_rdata,
+    input  logic            imem_ready,   // 1 = imem_rdata valid (I$ hit). Tie 1 for combinational memory.
     output logic [XLEN-1:0] dmem_addr,
     output logic [XLEN-1:0] dmem_wdata,
     output logic [3:0]      dmem_be,
     output logic            dmem_we,
+    output logic            dmem_re,      // load request (for the D$)
     input  logic [XLEN-1:0] dmem_rdata,
+    input  logic            dmem_ready,   // 1 = data access complete. Tie 1 for combinational memory.
     output logic [XLEN-1:0] dbg_pc,
     output logic            rvfi_valid,
     output logic [XLEN-1:0] rvfi_pc,
@@ -37,8 +40,17 @@ module riscv_pipeline #(
     logic            stall;        // load-use hazard (freezes IF/ID + PC)
     logic            redirect;     // from EX: branch mispredict, flush + recover
     logic [XLEN-1:0] redirect_pc;
-    logic            div_stall;    // multi-cycle divide in flight (freezes front-end)
+    logic            div_stall;    // multi-cycle mul/div in flight (freezes front-end)
     wire             front_stall = stall || div_stall;
+
+    // Memory-stall handshake. A global freeze of every pipeline register while the
+    // I$ has no instruction (imem_ready=0) or a load/store in MEM is outstanding
+    // (dmem_req && !dmem_ready). With both ready tied high it is identically 0, so
+    // the core behaves exactly as the combinational-memory version.
+    logic            em_mem_read, em_mem_write;   // (registered in the EX/MEM stage)
+    wire             dmem_req  = em_mem_read || em_mem_write;
+    wire             mem_stall = !imem_ready || (dmem_req && !dmem_ready);
+    assign           dmem_re   = em_mem_read;
 
     // ---- dynamic branch predictor: direct-mapped BTB + 2-bit BHT ------------
     // Tagged by the full pc[31:2], so a hit is always the exact same PC that
@@ -74,8 +86,9 @@ module riscv_pipeline #(
     end
 
     always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) pc <= RESET_PC;
-        else        pc <= pc_next;
+        if      (!rst_n)    pc <= RESET_PC;
+        else if (mem_stall) pc <= pc;        // global memory-stall freeze
+        else                pc <= pc_next;
     end
     assign imem_addr = pc;
     assign dbg_pc    = pc;
@@ -93,6 +106,8 @@ module riscv_pipeline #(
             de_pc         <= '0;
             de_inst       <= 32'h0;
             de_pred_taken <= 1'b0;
+        end else if (mem_stall) begin
+            // global memory-stall freeze (holds before redirect/front_stall)
         end else if (redirect) begin
             de_valid      <= 1'b0;      // flush younger (wrong-path) instruction
             de_inst       <= 32'h0;
@@ -257,11 +272,14 @@ module riscv_pipeline #(
     logic [XLEN-1:0] rf_rs1, rf_rs2, wb_wdata;
     logic            wb_valid, wb_reg_write;
     logic [4:0]      wb_rd;
+    // a WB instruction commits exactly once, on the cycle the pipe advances
+    // (not on every frozen cycle of a memory stall) -- so gate with !mem_stall.
+    wire wb_commit = wb_valid && !mem_stall;
     regfile #(.XLEN(XLEN), .WRITE_FIRST(1'b1)) u_rf (
         .clk, .rst_n,
         .rs1_addr(de_rs1), .rs2_addr(de_rs2),
         .rs1_data(rf_rs1), .rs2_data(rf_rs2),
-        .we(wb_valid && wb_reg_write), .rd_addr(wb_rd), .rd_data(wb_wdata)
+        .we(wb_commit && wb_reg_write), .rd_addr(wb_rd), .rd_data(wb_wdata)
     );
 
     // ====================================================== ID/EX register
@@ -299,6 +317,8 @@ module riscv_pipeline #(
             ex_pred_taken <= 1'b0;
             ex_is_csr     <= 1'b0; ex_is_ecall <= 1'b0;
             ex_is_ebreak  <= 1'b0; ex_is_mret  <= 1'b0; ex_legal <= 1'b1;
+        end else if (mem_stall) begin
+            // global memory-stall freeze: hold EX
         end else if (div_stall) begin
             // hold the divide instruction in EX until the divider completes
         end else if (ex_bubble) begin
@@ -352,7 +372,7 @@ module riscv_pipeline #(
     // forwarding sources
     logic [XLEN-1:0] em_alu_y, em_pc4, em_store_data;
     logic [4:0]      em_rd;
-    logic            em_valid, em_reg_write, em_mem_write;
+    logic            em_valid, em_reg_write;   // em_mem_read/write declared in IF stage
     logic [1:0]      em_wb_sel;
     logic [2:0]      em_funct3;
 
@@ -399,7 +419,7 @@ module riscv_pipeline #(
     divider #(.XLEN(XLEN)) u_div (
         .clk, .rst_n,
         .start(div_start), .is_signed(div_is_signed), .want_rem(div_want_rem),
-        .a(fwd_a), .b(fwd_b),
+        .hold(mem_stall), .a(fwd_a), .b(fwd_b),
         .busy(div_busy), .done(div_done), .result(div_result)
     );
 
@@ -419,7 +439,7 @@ module riscv_pipeline #(
     mul_seq #(.XLEN(XLEN)) u_mul (
         .clk, .rst_n,
         .start(mul_start), .a_is_signed(mul_a_signed), .b_is_signed(mul_b_signed),
-        .sel_high(mul_sel_high), .a(fwd_a), .b(fwd_b),
+        .sel_high(mul_sel_high), .hold(mem_stall), .a(fwd_a), .b(fwd_b),
         .busy(mul_busy), .done(mul_done), .result(mul_result)
     );
 
@@ -497,12 +517,14 @@ module riscv_pipeline #(
     csr #(.XLEN(XLEN)) u_csr (
         .clk, .rst_n,
         .csr_addr(ex_csr_addr), .csr_op(ex_csr_op), .csr_wsrc(csr_wsrc),
-        .csr_we(ex_valid && csr_we_intent),     // module suppresses on csr_illegal
+        // gate side effects with !mem_stall so they fire once (when the
+        // instruction actually advances), never repeatedly during a freeze.
+        .csr_we(ex_valid && csr_we_intent && !mem_stall),
         .csr_rdata(csr_rdata), .csr_illegal(csr_illegal),
-        .trap(ex_trap), .trap_cause(trap_cause), .trap_epc(ex_pc), .trap_tval(trap_tval),
-        .mret(ex_do_mret),
+        .trap(ex_trap && !mem_stall), .trap_cause(trap_cause), .trap_epc(ex_pc), .trap_tval(trap_tval),
+        .mret(ex_do_mret && !mem_stall),
         .trap_target(csr_trap_target), .mret_target(csr_mret_target),
-        .instret_inc(ex_valid && !div_stall && !ex_trap)   // counts EX-stage retirements
+        .instret_inc(ex_valid && !div_stall && !ex_trap && !mem_stall)
     );
 
     // Redirect on: synchronous trap (-> mtvec), MRET (-> mepc), or a branch
@@ -525,7 +547,7 @@ module riscv_pipeline #(
                 btb_uncond[bi] <= 1'b0;
                 bht[bi]        <= 2'b01;     // weakly not-taken
             end
-        end else if (ex_valid && ex_is_ctrl && !ex_trap) begin
+        end else if (ex_valid && ex_is_ctrl && !ex_trap && !mem_stall) begin
             if (actual_taken) begin          // allocate / refresh target on taken
                 btb_valid[ex_idx]  <= 1'b1;
                 btb_uncond[ex_idx] <= ex_jump;
@@ -550,18 +572,24 @@ module riscv_pipeline #(
         if (!rst_n) begin
             em_valid     <= 1'b0;
             em_reg_write <= 1'b0;
+            em_mem_read  <= 1'b0;
             em_mem_write <= 1'b0;
             em_rd        <= 5'd0;
+        end else if (mem_stall) begin
+            // global memory-stall freeze: hold MEM (the outstanding access stays
+            // presented to the D$ until it completes)
         end else if (div_stall) begin
             // insert a bubble into MEM while the divide is still computing
             em_valid     <= 1'b0;
             em_reg_write <= 1'b0;
+            em_mem_read  <= 1'b0;
             em_mem_write <= 1'b0;
         end else begin
             // A trapping instruction still retires (em_valid=1, for RVFI) but its
             // architectural GPR/memory writes are suppressed.
             em_valid     <= ex_valid;
             em_reg_write <= ex_valid && ex_reg_write && !ex_trap;
+            em_mem_read  <= ex_valid && ex_mem_read  && !ex_trap;
             em_mem_write <= ex_valid && ex_mem_write && !ex_trap;
             em_alu_y     <= ex_result;          // CSR read / divide result / ALU
             em_pc4       <= ex_pc + 32'd4;
@@ -626,6 +654,8 @@ module riscv_pipeline #(
             wb_reg_write <= 1'b0;
             wb_rd        <= 5'd0;
             wb_wdata     <= '0;
+        end else if (mem_stall) begin
+            // freeze WB so the retiring record stays aligned with the held pipe
         end else begin
             wb_valid     <= em_valid;
             wb_reg_write <= em_valid && em_reg_write && (em_rd != 5'd0);
@@ -635,7 +665,7 @@ module riscv_pipeline #(
     end
 
     // ============================================================ WB / RVFI
-    assign rvfi_valid = wb_valid;
+    assign rvfi_valid = wb_commit;          // one retire pulse per instruction
     assign rvfi_pc    = wb_pc_r;
     assign rvfi_rd    = wb_rd;
     assign rvfi_we    = wb_valid && wb_reg_write;
@@ -647,6 +677,8 @@ module riscv_pipeline #(
         if (!rst_n) begin
             em_pc_r <= '0;
             wb_pc_r <= '0;
+        end else if (mem_stall) begin
+            // freeze in lockstep with EX/MEM and MEM/WB
         end else begin
             em_pc_r <= ex_pc;
             wb_pc_r <= em_pc_r;

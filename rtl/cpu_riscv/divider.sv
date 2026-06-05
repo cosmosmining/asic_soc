@@ -14,6 +14,7 @@ module divider #(
     input  logic            start,
     input  logic            is_signed,   // DIV/REM vs DIVU/REMU
     input  logic            want_rem,    // 0=quotient, 1=remainder
+    input  logic            hold,        // freeze (e.g. external memory stall)
     input  logic [XLEN-1:0] a,           // dividend
     input  logic [XLEN-1:0] b,           // divisor
     output logic            busy,
@@ -38,6 +39,8 @@ module divider #(
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             state <= IDLE; done <= 1'b0; result <= '0;
+        end else if (hold) begin
+            // frozen: hold all state (incl. a completed `done`) until released
         end else begin
             done <= 1'b0;
             case (state)

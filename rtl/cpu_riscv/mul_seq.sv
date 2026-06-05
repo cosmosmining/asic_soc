@@ -16,6 +16,7 @@ module mul_seq #(
     input  logic            a_is_signed,   // treat a as signed (MUL/MULH/MULHSU)
     input  logic            b_is_signed,   // treat b as signed (MUL/MULH)
     input  logic            sel_high,      // 1=upper half (MULH*), 0=lower (MUL)
+    input  logic            hold,          // freeze (e.g. external memory stall)
     input  logic [XLEN-1:0] a,
     input  logic [XLEN-1:0] b,
     output logic            busy,
@@ -43,6 +44,8 @@ module mul_seq #(
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             state <= IDLE; done <= 1'b0; result <= '0;
+        end else if (hold) begin
+            // frozen: hold all state (incl. a completed `done`) until released
         end else begin
             done <= 1'b0;
             unique case (state)

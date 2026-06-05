@@ -42,6 +42,14 @@ for vv in $CSR_CORES; do
     echo "   $vv: $r"; [[ "$r" == PASS ]] || fails=$((fails+1))
 done
 
+# Full-SoC end-to-end: same program through pipeline + I$/D$ + AXI4-Lite SRAM.
+echo ">> building + running SoC differential test (caches + AXI4-Lite)"
+iverilog $IVFLAGS -s tb_soc -o "$BUILD/tb_soc.vvp" $RTL $HELP "$ROOT/tb/directed/tb_soc.sv" 2>/dev/null
+for prog in test_core csr_test; do
+    r=$(run_one "$BUILD/tb_soc.vvp" "$ROOT/tb/directed/programs/$prog.hex")
+    echo "   soc/$prog: $r"; [[ "$r" == PASS ]] || fails=$((fails+1))
+done
+
 echo ">> $N_SEEDS linear random differential tests ($N_INSTR instr each)"
 for s in $(seq 1 "$N_SEEDS"); do
     python3 "$ROOT/tools/scripts/gen_rand_prog.py" "$s" "$N_INSTR" > "$BUILD/rand_$s.hex"

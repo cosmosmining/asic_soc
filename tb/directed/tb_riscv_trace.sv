@@ -34,16 +34,23 @@ module tb_riscv_trace;
     logic [XLEN-1:0] rvfi_wdata;
 
 `ifdef PIPELINE
+    // pipeline has a memory-stall handshake; tie ready high (combinational memory)
     riscv_pipeline #(.XLEN(XLEN)) dut (
+        .clk, .rst_n,
+        .imem_addr, .imem_rdata, .imem_ready(1'b1),
+        .dmem_addr, .dmem_wdata, .dmem_be, .dmem_we, .dmem_re(), .dmem_rdata, .dmem_ready(1'b1),
+        .dbg_pc,
+        .rvfi_valid, .rvfi_pc, .rvfi_rd, .rvfi_we, .rvfi_wdata
+    );
 `else
     riscv_core #(.XLEN(XLEN)) dut (
-`endif
         .clk, .rst_n,
         .imem_addr, .imem_rdata,
         .dmem_addr, .dmem_wdata, .dmem_be, .dmem_we, .dmem_rdata,
         .dbg_pc,
         .rvfi_valid, .rvfi_pc, .rvfi_rd, .rvfi_we, .rvfi_wdata
     );
+`endif
 
     // unified word-addressed memory, async read / sync byte-write
     logic [XLEN-1:0] mem [0:WORDS-1];

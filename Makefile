@@ -21,6 +21,8 @@ RTL_CORE := rtl/cpu_riscv/regfile.sv rtl/cpu_riscv/csr.sv rtl/cpu_riscv/alu.sv \
             rtl/cpu_riscv/riscv_core.sv
 RTL_PIPE := rtl/cpu_riscv/regfile.sv rtl/cpu_riscv/csr.sv rtl/cpu_riscv/alu.sv \
             rtl/cpu_riscv/divider.sv rtl/cpu_riscv/mul_seq.sv rtl/cpu_riscv/riscv_pipeline.sv
+RTL_SOC  := $(RTL_PIPE) rtl/soc/axi_sram.sv rtl/soc/riscv_cache.sv \
+            rtl/soc/axil_arb.sv rtl/soc/riscv_soc.sv
 
 # --- tools -----------------------------------------------------------------
 IVERILOG := iverilog
@@ -51,11 +53,14 @@ sim:                        ## single-cycle directed golden-trace test
 sim-pipeline:               ## 5-stage pipeline directed golden-trace test
 	bash tools/scripts/run_sim.sh tb_riscv_trace -DPIPELINE
 
+sim-soc:                    ## full-SoC test (pipeline + I$/D$ + AXI4-Lite SRAM)
+	bash tools/scripts/run_sim.sh tb_soc
+
 regress:                    ## full differential regression, both cores
 	bash tools/scripts/regress.sh $(SEEDS) $(INSTR)
 
 # --- lint ------------------------------------------------------------------
-lint: lint-core lint-pipe   ## Verilator lint both cores (0 warnings tolerated)
+lint: lint-core lint-pipe lint-soc  ## Verilator lint everything (0 warnings tolerated)
 
 lint-core:
 	@echo ">> lint riscv_core (single-cycle)"
@@ -64,6 +69,10 @@ lint-core:
 lint-pipe:
 	@echo ">> lint riscv_pipeline (5-stage)"
 	$(VERILATOR) $(VFLAGS) --top-module riscv_pipeline $(RTL_PIPE)
+
+lint-soc:
+	@echo ">> lint riscv_soc (pipeline + I\$$/D\$$ + AXI4-Lite SRAM)"
+	$(VERILATOR) $(VFLAGS) --top-module riscv_soc $(RTL_SOC)
 
 # --- synthesis -------------------------------------------------------------
 synth:                      ## generic yosys synth/area for the pipeline
