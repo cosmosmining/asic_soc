@@ -13,7 +13,7 @@ BUILD="$ROOT/build"
 mkdir -p "$BUILD"
 
 RTL=$(find "$ROOT/rtl" -name '*.sv' | sort)
-HELP=$(find "$ROOT/tb" -name '*.sv' ! -name 'tb_*' | sort)
+HELP=$(find "$ROOT/tb" -path '*/uvm/*' -prune -o -name '*.sv' ! -name 'tb_*' -print | sort)
 TB="$ROOT/tb/directed/tb_riscv_trace.sv"
 IVFLAGS="-g2012 -gsupported-assertions -I $ROOT/rtl/common"
 

@@ -5,6 +5,7 @@
     "VERILOG_FILES": [
         "dir::../../rtl/cpu_riscv/regfile.sv",
         "dir::../../rtl/cpu_riscv/alu.sv",
+        "dir::../../rtl/cpu_riscv/divider.sv",
         "dir::../../rtl/cpu_riscv/riscv_pipeline.sv"
     ],
     "VERILOG_INCLUDE_DIRS": ["dir::../../rtl/common"],

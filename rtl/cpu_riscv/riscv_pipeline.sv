@@ -34,9 +34,11 @@ module riscv_pipeline #(
 
     // ============================================================ IF stage
     logic [XLEN-1:0] pc, pc_next;
-    logic            stall;        // from hazard unit (freezes IF/ID + PC)
+    logic            stall;        // load-use hazard (freezes IF/ID + PC)
     logic            redirect;     // from EX: branch mispredict, flush + recover
     logic [XLEN-1:0] redirect_pc;
+    logic            div_stall;    // multi-cycle divide in flight (freezes front-end)
+    wire             front_stall = stall || div_stall;
 
     // ---- dynamic branch predictor: direct-mapped BTB + 2-bit BHT ------------
     // Tagged by the full pc[31:2], so a hit is always the exact same PC that
@@ -66,7 +68,7 @@ module riscv_pipeline #(
 
     always_comb begin
         if      (redirect)       pc_next = redirect_pc;     // mispredict recovery
-        else if (stall)          pc_next = pc;              // load-use hold
+        else if (front_stall)    pc_next = pc;              // load-use / divide hold
         else if (predict_taken)  pc_next = predict_target;  // predicted taken
         else                     pc_next = pc + 32'd4;
     end
@@ -95,8 +97,8 @@ module riscv_pipeline #(
             de_valid      <= 1'b0;      // flush younger (wrong-path) instruction
             de_inst       <= 32'h0;
             de_pred_taken <= 1'b0;
-        end else if (stall) begin
-            // hold IF/ID
+        end else if (front_stall) begin
+            // hold IF/ID (load-use or divide)
         end else begin
             de_valid       <= 1'b1;
             de_pc          <= pc;
@@ -258,6 +260,8 @@ module riscv_pipeline #(
             ex_jalr       <= 1'b0;
             ex_rd         <= 5'd0;
             ex_pred_taken <= 1'b0;
+        end else if (div_stall) begin
+            // hold the divide instruction in EX until the divider completes
         end else if (ex_bubble) begin
             ex_valid      <= 1'b0;
             ex_reg_write  <= 1'b0;
@@ -328,9 +332,32 @@ module riscv_pipeline #(
     logic            alu_zero_unused;
     assign alu_a = ex_use_pc ? ex_pc : fwd_a;
     assign alu_b = ex_alu_src_imm ? ex_imm_alu : fwd_b;
-    alu #(.XLEN(XLEN)) u_alu (
+    // pipeline ALU has no divide hardware; DIV/REM go to the sequential unit
+    alu #(.XLEN(XLEN), .HAS_DIV(1'b0)) u_alu (
         .op(ex_alu_op), .a(alu_a), .b(alu_b), .y(alu_y), .zero(alu_zero_unused)
     );
+
+    // ---- multi-cycle divider (DIV/DIVU/REM/REMU) ----------------------------
+    wire div_op    = (ex_alu_op == `ALU_DIV)  || (ex_alu_op == `ALU_DIVU) ||
+                     (ex_alu_op == `ALU_REM)  || (ex_alu_op == `ALU_REMU);
+    wire ex_is_div = ex_valid && div_op;
+    wire div_is_signed = (ex_alu_op == `ALU_DIV) || (ex_alu_op == `ALU_REM);
+    wire div_want_rem  = (ex_alu_op == `ALU_REM) || (ex_alu_op == `ALU_REMU);
+    logic            div_busy, div_done;
+    logic [XLEN-1:0] div_result;
+    wire             div_start = ex_is_div && !div_busy && !div_done;
+    // hold the whole front-end while a divide is in flight
+    assign           div_stall = ex_is_div && !div_done;
+
+    divider #(.XLEN(XLEN)) u_div (
+        .clk, .rst_n,
+        .start(div_start), .is_signed(div_is_signed), .want_rem(div_want_rem),
+        .a(fwd_a), .b(fwd_b),
+        .busy(div_busy), .done(div_done), .result(div_result)
+    );
+
+    // EX result feeding EX/MEM: divide result for div ops, else ALU
+    wire [XLEN-1:0] ex_result = div_op ? div_result : alu_y;
 
     // branch resolution (uses forwarded operands)
     logic eq, lt, ltu, take_branch;
@@ -406,12 +433,18 @@ module riscv_pipeline #(
             em_mem_read  <= 1'b0;
             em_mem_write <= 1'b0;
             em_rd        <= 5'd0;
+        end else if (div_stall) begin
+            // insert a bubble into MEM while the divide is still computing
+            em_valid     <= 1'b0;
+            em_reg_write <= 1'b0;
+            em_mem_read  <= 1'b0;
+            em_mem_write <= 1'b0;
         end else begin
             em_valid     <= ex_valid;
             em_reg_write <= ex_valid && ex_reg_write;
             em_mem_read  <= ex_valid && ex_mem_read;
             em_mem_write <= ex_valid && ex_mem_write;
-            em_alu_y     <= alu_y;
+            em_alu_y     <= ex_result;          // divide result for DIV/REM
             em_pc4       <= ex_pc + 32'd4;
             em_store_data<= fwd_b;
             em_rd        <= ex_rd;

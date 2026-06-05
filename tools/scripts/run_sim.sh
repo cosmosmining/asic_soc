@@ -13,7 +13,7 @@ mkdir -p "$BUILD"
 # Gather sources: all synthesizable RTL, shared TB helpers (tb files NOT named
 # tb_*, e.g. golden models), and the requested TB top.
 RTL_FILES=$(find "$ROOT/rtl" -name '*.sv' | sort)
-TB_HELPERS=$(find "$ROOT/tb" -name '*.sv' ! -name 'tb_*' | sort)
+TB_HELPERS=$(find "$ROOT/tb" -path '*/uvm/*' -prune -o -name '*.sv' ! -name 'tb_*' -print | sort)
 TB_FILE=$(find "$ROOT/tb" -name "${TB_TOP}.sv" | head -1)
 
 if [[ -z "${TB_FILE}" ]]; then

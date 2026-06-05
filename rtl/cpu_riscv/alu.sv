@@ -1,8 +1,12 @@
 // alu.sv - RV32IM ALU. Combinational. Includes M-extension multiply ops.
+// HAS_DIV: when 1 (single-cycle core) DIV/REM are combinational; when 0
+// (pipeline) they are handled by the external multi-cycle divider and the ALU
+// contains no divide hardware (huge area/timing saving).
 `include "riscv_defs.svh"
 
 module alu #(
-    parameter int XLEN = 32
+    parameter int XLEN    = 32,
+    parameter bit HAS_DIV = 1'b1
 ) (
     input  logic [4:0]       op,
     input  logic [XLEN-1:0]  a,
@@ -17,14 +21,28 @@ module alu #(
     logic signed [2*XLEN-1:0] mul_ss;
     logic signed [2*XLEN-1:0] mul_su;
 
-    // M-extension divide corner cases (RISC-V spec):
-    //   x/0  -> DIV/DIVU = all-ones,  REM/REMU = dividend
-    //   INT_MIN / -1 (signed overflow) -> DIV = INT_MIN, REM = 0
     localparam logic [XLEN-1:0] MIN_S = {1'b1, {(XLEN-1){1'b0}}};
-    logic div0;
-    logic ovf;
-    assign div0 = (b == '0);
-    assign ovf  = (a == MIN_S) && (&b);   // b == -1
+
+    // Optional combinational divide unit (single-cycle core only).
+    logic [XLEN-1:0] div_y;
+    generate
+        if (HAS_DIV) begin : g_div
+            logic div0, ovf;
+            assign div0 = (b == '0);
+            assign ovf  = (a == MIN_S) && (&b);   // b == -1
+            always_comb begin
+                unique case (op)
+                    `ALU_DIV:  div_y = div0 ? {XLEN{1'b1}} : (ovf ? MIN_S : $unsigned(as / bs));
+                    `ALU_DIVU: div_y = div0 ? {XLEN{1'b1}} : (a / b);
+                    `ALU_REM:  div_y = div0 ? a : (ovf ? '0 : $unsigned(as % bs));
+                    `ALU_REMU: div_y = div0 ? a : (a % b);
+                    default:   div_y = '0;
+                endcase
+            end
+        end else begin : g_nodiv
+            assign div_y = '0;        // pipeline: divide done by external unit
+        end
+    endgenerate
 
     always_comb begin
         mul_uu = a  * b;                                  // unsigned x unsigned
@@ -47,10 +65,7 @@ module alu #(
             `ALU_MULHSU:y = mul_su[2*XLEN-1:XLEN];
             `ALU_MULHU: y = mul_uu[2*XLEN-1:XLEN];
             `ALU_PASSB: y = b;
-            `ALU_DIV:   y = div0 ? {XLEN{1'b1}} : (ovf ? MIN_S : $unsigned(as / bs));
-            `ALU_DIVU:  y = div0 ? {XLEN{1'b1}} : (a / b);
-            `ALU_REM:   y = div0 ? a : (ovf ? '0 : $unsigned(as % bs));
-            `ALU_REMU:  y = div0 ? a : (a % b);
+            `ALU_DIV, `ALU_DIVU, `ALU_REM, `ALU_REMU: y = div_y;
             default:    y = '0;
         endcase
     end

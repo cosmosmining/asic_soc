@@ -190,8 +190,45 @@ so the logic is sound; the UVM wrapper is for VCS/Questa/Xcelium.
 
 ---
 
+## Iteration 7 — multi-cycle divider (area + timing, fab-ability)
+
+**Goal (user priority #3, "stronger CPU"):** kill the combinational 32-bit divider
+that dominated area and the critical path and blocked practical P&R.
+
+**Changed**
+- New `rtl/cpu_riscv/divider.sv` — sequential restoring divider (~34 cycles),
+  signed/unsigned, spec corner cases (÷0, signed overflow) in a fast path.
+- `alu.sv` gained `HAS_DIV`: pipeline ALU now has **no divide hardware** (DIV/REM
+  routed to the sequential unit); single-cycle core keeps the combinational one.
+- `riscv_pipeline.sv` integrates the divider with a front-end **hold** (`div_stall`)
+  that freezes IF/ID/EX and bubbles MEM until the divide completes, then muxes the
+  result into EX/MEM. Added `divider.sv` to all synth/flow source lists.
+
+**Verify** — directed + **100 div-heavy random seeds**, both cores: **PASS**.
+
+**Result (real sky130, before → after):**
+| metric | combinational ÷ | sequential ÷ | Δ |
+|--------|-----------------|--------------|---|
+| std cells | 27,017 | **20,789** | −23% |
+| area | 0.235 mm² | **0.201 mm²** | −14% |
+| synth time | >3 min | seconds | — |
+| critical path | 32-bit ripple ÷ | small/cycle | **major timing win** |
+
+Throughput cost: DIV/REM now take ~34 cycles (CPI rises on div-heavy code) — the
+standard area/throughput trade every real CPU makes.
+
+**Next bottleneck** — no CSRs/privilege/traps (can't run real RISC-V system code);
+multiplier is still single-cycle combinational (next critical-path candidate); no
+caches/AXI memory subsystem.
+
+**Next single-step action** — CSR file + machine-mode traps (mcycle/minstret,
+mtvec/mepc/mcause, ECALL/EBREAK/MRET), extending the golden model + UVM reference.
+
+---
+
 ## Backlog (ordered)
 0. ~~Branch prediction (BTB + 2-bit BHT)~~ ✅ (Iteration 4)
+00. ~~Physical synth (sky130 area) + UVM env + multi-cycle divider~~ ✅ (Iter 5-7)
 1. ~~Golden-trace co-sim harness~~ ✅ (Iteration 2)
 2. ~~5-stage pipeline: forwarding, load-use stall, branch flush~~ ✅ (Iteration 2)
 3. ~~DIV/REM (M-extension)~~ ✅ (Iteration 3) — now combinational; multi-cycle later.
