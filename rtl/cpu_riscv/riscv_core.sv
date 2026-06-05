@@ -69,24 +69,35 @@ module riscv_core #(
     // ------------------------------------------------------- control signals
     logic        reg_write;
     logic        alu_src_imm;   // ALU operand B = immediate
+    logic        mem_read;      // a load (for misalignment checking)
     logic        mem_write;
     logic        branch;
     logic        jump;          // JAL/JALR (unconditional)
     logic        jalr;
     logic [4:0]  alu_op;
-    logic [1:0]  wb_sel;        // 0=alu, 1=mem, 2=pc+4, 3=imm_u(LUI)
+    logic [1:0]  wb_sel;        // 0=alu, 1=mem, 2=pc+4, 3=csr
     logic [XLEN-1:0] alu_b_imm; // selected immediate for ALU
+    // SYSTEM / Zicsr decode
+    logic        is_csr;        // a CSRR[W|S|C][I] instruction
+    logic        is_ecall, is_ebreak, is_mret;
+    logic        legal;         // instruction is a legal RV32IM/Zicsr encoding
 
     always_comb begin
         // defaults
         reg_write   = 1'b0;
         alu_src_imm = 1'b0;
+        mem_read    = 1'b0;
         mem_write   = 1'b0;
         branch      = 1'b0;
         jump        = 1'b0;
         jalr        = 1'b0;
         alu_op      = `ALU_ADD;
         wb_sel      = 2'd0;
+        is_csr      = 1'b0;
+        is_ecall    = 1'b0;
+        is_ebreak   = 1'b0;
+        is_mret     = 1'b0;
+        legal       = 1'b1;
         alu_b_imm   = imm_i;
 
         unique case (opcode)
@@ -106,6 +117,9 @@ module riscv_core #(
                         default: alu_op = `ALU_ADD;
                     endcase
                 end else begin
+                    // legal funct7: 0000000 (all f3); 0100000 only for SUB/SRA
+                    legal = (funct7 == 7'b0000000) ||
+                            (funct7 == 7'b0100000 && (funct3==3'b000 || funct3==3'b101));
                     unique case (funct3)
                         3'b000: alu_op = (funct7[5]) ? `ALU_SUB : `ALU_ADD;
                         3'b001: alu_op = `ALU_SLL;
@@ -131,28 +145,34 @@ module riscv_core #(
                     3'b100: alu_op = `ALU_XOR;                       // XORI
                     3'b110: alu_op = `ALU_OR;                        // ORI
                     3'b111: alu_op = `ALU_AND;                       // ANDI
-                    3'b001: alu_op = `ALU_SLL;                       // SLLI
-                    3'b101: alu_op = (funct7[5]) ? `ALU_SRA : `ALU_SRL; // SRAI/SRLI
+                    3'b001: begin alu_op = `ALU_SLL; legal = (funct7==7'b0000000); end // SLLI
+                    3'b101: begin alu_op = (funct7[5]) ? `ALU_SRA : `ALU_SRL;        // SRAI/SRLI
+                            legal = (funct7==7'b0000000 || funct7==7'b0100000); end
                     default: alu_op = `ALU_ADD;
                 endcase
             end
             `OPC_LOAD: begin
                 reg_write   = 1'b1;
                 alu_src_imm = 1'b1;
+                mem_read    = 1'b1;
                 alu_op      = `ALU_ADD;   // address = rs1 + imm_i
                 alu_b_imm   = imm_i;
                 wb_sel      = 2'd1;       // from memory
+                legal = (funct3==3'b000||funct3==3'b001||funct3==3'b010||
+                         funct3==3'b100||funct3==3'b101);
             end
             `OPC_STORE: begin
                 alu_src_imm = 1'b1;
                 mem_write   = 1'b1;
                 alu_op      = `ALU_ADD;   // address = rs1 + imm_s
                 alu_b_imm   = imm_s;
+                legal = (funct3==3'b000||funct3==3'b001||funct3==3'b010);
             end
             `OPC_BRANCH: begin
                 branch    = 1'b1;
                 alu_op    = `ALU_SUB;     // compare via subtract / flags
                 alu_b_imm = imm_b;
+                legal = (funct3!=3'b010 && funct3!=3'b011);
             end
             `OPC_JAL: begin
                 reg_write = 1'b1;
@@ -167,6 +187,7 @@ module riscv_core #(
                 alu_op      = `ALU_ADD;
                 alu_b_imm   = imm_i;
                 wb_sel      = 2'd2;
+                legal = (funct3==3'b000);
             end
             `OPC_LUI: begin
                 reg_write   = 1'b1;
@@ -182,17 +203,39 @@ module riscv_core #(
                 alu_b_imm   = imm_u;
                 wb_sel      = 2'd0;
             end
-            default: ; // NOP / unsupported: no architectural effect
+            `OPC_MISCMEM: begin // FENCE / FENCE.I : architecturally a NOP here
+                legal = (funct3==3'b000 || funct3==3'b001);
+            end
+            `OPC_SYSTEM: begin
+                if (funct3 == `SYS_PRIV) begin
+                    unique case (inst[31:20])
+                        `PRIV_ECALL : is_ecall  = 1'b1;
+                        `PRIV_EBREAK: is_ebreak = 1'b1;
+                        `PRIV_MRET  : is_mret   = 1'b1;
+                        `PRIV_WFI   : ;                   // WFI: NOP
+                        default     : legal     = 1'b0;
+                    endcase
+                end else if (funct3 == 3'b100) begin
+                    legal = 1'b0;                          // no f3=100 CSR op
+                end else begin                             // CSRR[W|S|C][I]
+                    is_csr    = 1'b1;
+                    reg_write = 1'b1;                       // rd <- old CSR value
+                    wb_sel    = 2'd3;                       // writeback from CSR
+                end
+            end
+            default: legal = 1'b0;       // unknown opcode -> illegal instruction
         endcase
     end
 
     // ----------------------------------------------------------- register file
+    // (write suppressed when the instruction traps; `trap` declared below)
+    logic            trap;
     logic [XLEN-1:0] rs1_data, rs2_data, wb_data;
     regfile #(.XLEN(XLEN)) u_rf (
         .clk, .rst_n,
         .rs1_addr(rs1), .rs2_addr(rs2),
         .rs1_data(rs1_data), .rs2_data(rs2_data),
-        .we(reg_write), .rd_addr(rd), .rd_data(wb_data)
+        .we(reg_write && !trap), .rd_addr(rd), .rd_data(wb_data)
     );
 
     // --------------------------------------------------------------- ALU
@@ -225,16 +268,68 @@ module riscv_core #(
         end
     end
 
-    // --------------------------------------------------------- next-PC logic
-    logic [XLEN-1:0] branch_target, jal_target, jalr_target;
+    // --------------------------------------------------------- control targets
+    logic [XLEN-1:0] branch_target, jal_target, jalr_target, ctrl_target;
+    logic            take_ctrl;
     assign branch_target = pc + imm_b;
     assign jal_target    = pc + imm_j;
     assign jalr_target   = (rs1_data + imm_i) & ~32'h1; // clear LSB per spec
+    assign take_ctrl     = jump || (branch && take_branch);
+    assign ctrl_target   = jalr ? jalr_target : (jump ? jal_target : branch_target);
+
+    // effective load/store address == ALU result (rs1 + imm) for LOAD/STORE
+    wire [XLEN-1:0] mem_addr = alu_y;
+
+    // ------------------------------------------------------------- CSR access
+    logic [11:0]     csr_addr;
+    logic [1:0]      csr_op;
+    logic [XLEN-1:0] csr_wsrc, csr_rdata;
+    logic            csr_we_intent, csr_illegal;
+    logic [XLEN-1:0] csr_trap_target, csr_mret_target;
+    assign csr_addr      = inst[31:20];
+    assign csr_op        = funct3[1:0];
+    assign csr_wsrc      = funct3[2] ? {27'b0, rs1} : rs1_data;   // *I uses zimm
+    assign csr_we_intent = is_csr && ((csr_op == `CSR_RW) || (rs1 != 5'd0));
+
+    // --------------------------------------------------------- trap detection
+    logic [XLEN-1:0] trap_cause, trap_tval;
+    logic            ld_ma, st_ma, insn_ma;
+    assign ld_ma   = mem_read  && ((funct3==3'b010 && mem_addr[1:0]!=2'b00) ||
+                                   ((funct3==3'b001||funct3==3'b101) && mem_addr[0]));
+    assign st_ma   = mem_write && ((funct3==3'b010 && mem_addr[1:0]!=2'b00) ||
+                                   (funct3==3'b001 && mem_addr[0]));
+    assign insn_ma = take_ctrl && (ctrl_target[1:0] != 2'b00);
     always_comb begin
-        if (jalr)                   pc_next = jalr_target;
-        else if (jump)              pc_next = jal_target;     // JAL
-        else if (take_branch)       pc_next = branch_target;
-        else                        pc_next = pc_plus4;
+        trap = 1'b1;
+        if      (!legal)                begin trap_cause = `CAUSE_ILLEGAL_INSN;  trap_tval = inst; end
+        else if (is_csr && csr_illegal) begin trap_cause = `CAUSE_ILLEGAL_INSN;  trap_tval = inst; end
+        else if (insn_ma)               begin trap_cause = `CAUSE_INSN_MISALIGN; trap_tval = ctrl_target; end
+        else if (ld_ma)                 begin trap_cause = `CAUSE_LOAD_MISALIGN; trap_tval = mem_addr; end
+        else if (st_ma)                 begin trap_cause = `CAUSE_STORE_MISALIGN;trap_tval = mem_addr; end
+        else if (is_ecall)              begin trap_cause = `CAUSE_ECALL_M;       trap_tval = '0; end
+        else if (is_ebreak)             begin trap_cause = `CAUSE_BREAKPOINT;    trap_tval = '0; end
+        else                            begin trap = 1'b0; trap_cause = '0;      trap_tval = '0; end
+    end
+
+    csr #(.XLEN(XLEN)) u_csr (
+        .clk, .rst_n,
+        .csr_addr, .csr_op, .csr_wsrc,
+        .csr_we(csr_we_intent),             // module suppresses write if csr_illegal
+        .csr_rdata, .csr_illegal,
+        .trap, .trap_cause, .trap_epc(pc), .trap_tval,
+        .mret(is_mret),
+        .trap_target(csr_trap_target), .mret_target(csr_mret_target),
+        .instret_inc(!trap)                 // single-cycle: one retire/cycle unless trapping
+    );
+
+    // --------------------------------------------------------- next-PC logic
+    always_comb begin
+        if      (trap)        pc_next = csr_trap_target;     // synchronous trap -> mtvec
+        else if (is_mret)     pc_next = csr_mret_target;     // MRET -> mepc
+        else if (jalr)        pc_next = jalr_target;
+        else if (jump)        pc_next = jal_target;          // JAL
+        else if (take_branch) pc_next = branch_target;
+        else                  pc_next = pc_plus4;
     end
 
     // ----------------------------------------------------------- data memory
@@ -244,7 +339,7 @@ module riscv_core #(
     assign byte_off  = alu_y[1:0];
 
     always_comb begin
-        dmem_we    = mem_write;
+        dmem_we    = mem_write && !trap;   // misaligned store traps -> no write
         dmem_be    = 4'b0000;
         dmem_wdata = rs2_data;
         if (mem_write) begin
@@ -289,6 +384,7 @@ module riscv_core #(
             2'd0:    wb_data = alu_y;       // ALU result (incl. LUI/AUIPC)
             2'd1:    wb_data = load_data;   // load
             2'd2:    wb_data = pc_plus4;    // JAL/JALR link
+            2'd3:    wb_data = csr_rdata;   // CSR read (CSRR[W|S|C][I])
             default: wb_data = alu_y;
         endcase
     end
@@ -304,11 +400,13 @@ module riscv_core #(
             rvfi_we    <= 1'b0;
             rvfi_wdata <= '0;
         end else begin
+            // Every instruction retires (one per cycle); a trapping instruction
+            // commits with we=0 (its architectural GPR write is suppressed).
             rvfi_valid <= 1'b1;
             rvfi_pc    <= pc;
             rvfi_rd    <= rd;
-            rvfi_we    <= reg_write && (rd != 5'd0);
-            rvfi_wdata <= (reg_write && rd != 5'd0) ? wb_data : '0;
+            rvfi_we    <= reg_write && !trap && (rd != 5'd0);
+            rvfi_wdata <= (reg_write && !trap && rd != 5'd0) ? wb_data : '0;
         end
     end
 endmodule

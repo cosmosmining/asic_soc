@@ -15,3 +15,7 @@ lint_off -rule UNUSEDSIGNAL -file "*/alu.sv" -match "*'mul_ss'*"
 // divider.sv: `rem` carries one extra guard bit [XLEN] for the shift-compare in
 // CALC; the final remainder only reads [XLEN-1:0]. The guard bit is by design.
 lint_off -rule UNUSEDSIGNAL -file "*/divider.sv" -match "*'rem'*"
+
+// csr.sv: mepc enforces IALIGN=32 by forcing bit 0 of the trapped PC to 0
+// ({trap_epc[XLEN-1:1],1'b0}); trap_epc[0] is intentionally dropped.
+lint_off -rule UNUSEDSIGNAL -file "*/csr.sv" -match "*'trap_epc'*"

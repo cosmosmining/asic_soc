@@ -24,8 +24,8 @@ fi
 echo ">> using liberty: $LIB"
 
 case "$TOP" in
-    riscv_pipeline) SRCS="rtl/cpu_riscv/regfile.sv rtl/cpu_riscv/alu.sv rtl/cpu_riscv/divider.sv rtl/cpu_riscv/riscv_pipeline.sv" ;;
-    riscv_core)     SRCS="rtl/cpu_riscv/regfile.sv rtl/cpu_riscv/alu.sv rtl/cpu_riscv/riscv_core.sv" ;;
+    riscv_pipeline) SRCS="rtl/cpu_riscv/regfile.sv rtl/cpu_riscv/csr.sv rtl/cpu_riscv/alu.sv rtl/cpu_riscv/divider.sv rtl/cpu_riscv/riscv_pipeline.sv" ;;
+    riscv_core)     SRCS="rtl/cpu_riscv/regfile.sv rtl/cpu_riscv/csr.sv rtl/cpu_riscv/alu.sv rtl/cpu_riscv/riscv_core.sv" ;;
     *) echo "unknown top $TOP" >&2; exit 1 ;;
 esac
 

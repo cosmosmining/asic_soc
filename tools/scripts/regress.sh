@@ -33,6 +33,15 @@ for vv in tb_sc tb_pl; do
     echo "   $vv: $r"; echo "$r" | grep -q PASS || fails=$((fails+1))
 done
 
+# Directed Zicsr/M-mode trap test. CSR_CORES lists the binaries that implement
+# the privileged subset (single-cycle + pipeline once integrated).
+CSR_CORES="${CSR_CORES:-tb_sc}"
+echo ">> directed CSR/trap test (csr_test.hex) on: $CSR_CORES"
+for vv in $CSR_CORES; do
+    r=$(run_one "$BUILD/$vv.vvp" "$ROOT/tb/directed/programs/csr_test.hex")
+    echo "   $vv: $r"; [[ "$r" == PASS ]] || fails=$((fails+1))
+done
+
 echo ">> $N_SEEDS random differential tests ($N_INSTR instr each)"
 for s in $(seq 1 "$N_SEEDS"); do
     python3 "$ROOT/tools/scripts/gen_rand_prog.py" "$s" "$N_INSTR" > "$BUILD/rand_$s.hex"
