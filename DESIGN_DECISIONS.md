@@ -66,11 +66,29 @@ every block gets a timing/CDC note here).
 
 ---
 ## riscv-soc (RTL track) — decisions & block CDC/timing notes
-_Phase 1. Each block (AXI interconnect, boot ROM, SRAM ctrl, UART, timer, async FIFO,
-arbiter, DMA) gets its timing/CDC note here as it lands._
+_Phase 1. Each block gets its timing/CDC note here as it lands._
 
-_First decisions to make when Phase 1 opens: AXI4-Lite fabric topology (shared-bus +
-decoder vs crossbar); gshare vs the existing BTB+BHT predictor for the stretch item._
+_Open decisions for the bus: AXI4-Lite fabric topology (shared-bus + decoder vs
+crossbar); gshare vs the existing BTB+BHT predictor for the stretch item._
+
+### D-SOC.1 Async FIFO (CDC showcase block)
+- **Design:** Cummings-style dual-clock FIFO. Pointers are AW+1 bits (extra MSB
+  separates full from empty); each pointer crosses domains as **Gray code** through a
+  2-flop synchronizer (`sync_2ff`).
+- **Options for pointer crossing:** (A) Gray pointers + 2-FF sync; (B) handshake/req-ack
+  FIFO; (C) async clear + mux-recirculation. Chose A — the standard, lowest-latency,
+  formally-tractable approach for a pure rate-decoupling FIFO.
+- **CDC note:** the *only* signals crossing clock domains are `wgray` and `rgray`. Gray
+  coding guarantees a single-bit change per increment, so a 2-FF synchronizer resolves to
+  the old or new value — never an illegal intermediate. Binary pointers, memory, and
+  data never cross. The `wfull`/`rempty` compares use the synchronized opposite pointer,
+  so they can be pessimistic by a couple of cycles (never optimistic) → no overflow/underflow.
+- **Timing/SDC note:** apply `set_false_path` (or a max-delay ≤ 1 destination period) on the
+  `sync_2ff.d` inputs; STA must not try to time the asynchronous launch→capture path.
+- **Verification:** dual-clock self-checking sim (256 words, 0 errors); **Gray-pointer
+  invariants P1/P2 formally proven** (yosys-smtbmc + z3, BMC base + unbounded induction,
+  `formal/run_gray_proof.sh` / `gray_inc.sby`). Multiclock FIFO-level ordering/depth proofs
+  are the dv-track extension.
 
 ## riscv-soc-dv (DV track) — decisions
 _Phase 2. Process gate: you write the verification plan first; I interview on the DUT and

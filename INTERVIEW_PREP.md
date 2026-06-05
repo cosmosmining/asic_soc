@@ -41,9 +41,34 @@ core but not the pipeline.
 
 ---
 ## riscv-soc (RTL track)
-_Seeded as blocks land. Expect: AXI4-Lite handshake rules, why Gray-code pointers for the
-async FIFO, 2-flop synchronizer MTBF intuition, round-robin fairness, DMA descriptor flow,
-clock-gating power mechanism._
+
+**Q. Why Gray-code the FIFO pointers instead of binary?**
+A binary counter can flip many bits at once (0111→1000). A multi-bit synchronizer samples
+each bit independently, so it could latch a transient value that never existed, corrupting
+the full/empty compare. Gray code changes exactly one bit per increment, so the
+synchronized pointer is always the old or new count — the compare is always safe. I proved
+the single-bit-transition invariant formally (yosys-smtbmc + z3).
+
+**Q. Why two flops in the synchronizer, and what sets the count?**
+The first flop can go metastable; the second gives it (almost) a full destination clock to
+settle, and MTBF rises exponentially with that settling time. Two is the standard for
+moderate clock ratios; very high-frequency or high-reliability crossings add a third.
+
+**Q. How do full and empty stay correct across two clocks if the pointers are stale?**
+Each side compares its own pointer against the *synchronized* opposite pointer, which lags
+by up to ~2 cycles. That lag only ever makes `full`/`empty` pessimistic (assert slightly
+early / deassert slightly late), never optimistic — so you can never overflow or underflow,
+only briefly under-utilize. That's the safe direction.
+
+**Q. What do you constrain in SDC for this block?**
+`set_false_path` (or a max-delay bounded by one destination period) on the synchronizer
+data inputs, so STA doesn't time the asynchronous launch→capture edge.
+
+**Gaps to study (riscv-soc):** exact MTBF formula and how to back out settling time; AXI4-Lite
+vs full AXI4 (no bursts/IDs) handshake corner cases; gshare aliasing vs the BTB+BHT I have;
+clock-gating insertion + how DC reports the dynamic-power delta.
+
+_Expanding as AXI fabric / arbiter / DMA land._
 
 ## riscv-soc-dv (DV track)
 _Seeded in Phase 2. Expect: UVM phasing, RAL frontdoor/backdoor, scoreboard vs predictor,

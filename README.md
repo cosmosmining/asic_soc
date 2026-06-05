@@ -32,6 +32,7 @@ Legend: ✅ built & reproduced · 🟡 in progress · ⬜ planned · ⏳ pending
 | sky130 synthesis | 20,789 cells / **0.201 mm²** | core | `prior` — PROGRESS Iter-7 (Yosys+sky130; PD track reproduces) |
 | Routed GDSII (sky130) | die 2.03 mm², **0 router DRC**, post-CTS timing MET @50 MHz | core | `prior` — Iter-8 OpenLane; post-route timing NOT closed, LVS not run (see [`gds_flow/RESULTS.md`](gds_flow/RESULTS.md)) |
 | Verilator lint (core) | 51 warnings, 0 errors — **not yet clean** | core | `CI` — baseline; lint-clean is a Phase-1 task |
+| Async FIFO (CDC showcase) | sim 256 words/2 clocks 0 err; **Gray invariants formally proven** | riscv-soc | `CI` — iverilog + yosys-smtbmc/z3 |
 | DC dynamic power Δ (clock gating) | — | riscv-soc | ⏳ `pending-CMU` |
 | UVM functional coverage ≥95% | — | riscv-soc-dv | ⏳ pending (DV track) |
 | ATPG stuck-at coverage ≥98% | — | riscv-soc-dft | ⏳ pending (DFT track) |

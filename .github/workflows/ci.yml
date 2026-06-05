@@ -31,3 +31,15 @@ jobs:
           verilator --version
       - name: Lint core RTL
         run: make lint
+
+  riscv-soc:
+    name: riscv-soc track — lint + sim + formal (blocking)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Verilator + Icarus + Yosys + z3
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y verilator iverilog yosys z3
+      - name: Lint, simulate, and formally prove (async FIFO)
+        run: make -C riscv-soc all
