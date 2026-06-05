@@ -5,3 +5,4 @@ build/
 build/*.hex
 tools/.venv/
 tools/pdk/
+tools/OpenLane/
