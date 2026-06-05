@@ -226,15 +226,73 @@ mtvec/mepc/mcause, ECALL/EBREAK/MRET), extending the golden model + UVM referenc
 
 ---
 
+## Iteration 9 — commercial hardening: Zicsr/traps, M-unit, AXI4-Lite SoC, PPA
+
+**Goal (user ask, "more robust + closer to a commercial chip; add AXI4-Lite,
+caches, branch prediction; put real PPA numbers on the bullet"):** close the
+biggest gaps between a verified core and a real SoC, and report measured PPA.
+
+**Changed**
+- *Process / lint (9a):* sized every ALU op 5 bits (killed ~44 Verilator
+  WIDTHEXPAND warnings), removed dead nets, added `tools/verilator/lint_waivers.vlt`,
+  a top-level `Makefile`, and **GitHub Actions CI** (`.github/workflows/ci.yml`)
+  that lints (0 warnings) + runs the differential regression on every push.
+- *Zicsr + M-mode traps (9b/9c):* new `rtl/cpu_riscv/csr.sv` (mstatus/mie/mtvec/
+  mscratch/mepc/mcause/mtval/mip, misa, mhartid, 64-bit mcycle/minstret), full
+  instruction-legality decode → illegal-instruction trap, ECALL/EBREAK/MRET, and
+  load/store/instruction address-misaligned traps. Integrated into **both** cores
+  (single-cycle + pipeline; pipeline resolves traps/CSR in EX over the existing
+  redirect path) and the independent golden ISS. New `gen_csr_test.py` directed
+  test (every CSR op, minstret, all trap causes) + mscratch CSR ops in the random
+  generator.
+- *Sequential multiplier (9d):* `rtl/cpu_riscv/mul_seq.sv` — the combinational
+  32×32 multiplier dominated the critical path and made std-cell mapping
+  intractable (ABC ran minutes); the multi-cycle unit (like the divider) fixes
+  area, timing, and synth runtime. `alu.sv` gains `HAS_MUL`.
+- *AXI4-Lite memory subsystem + SoC (9e/9f):* `rtl/soc/` — `axi_sram.sv`
+  (AXI4-Lite SRAM slave), `riscv_cache.sv` (direct-mapped, read-only I$ /
+  write-through D$, line fill = single-beat AXI4-Lite reads), `axil_arb.sv`
+  (2→1 AXI4-Lite interconnect), `riscv_soc.sv` (pipeline + I$ + D$ + arb + SRAM).
+  The pipeline gained a memory-stall handshake (global freeze; mul/div `hold`)
+  that is bit-identical to before when memory is always-ready.
+
+**Verify** — `make lint` clean across core/pipeline/SoC (Verilator -Wall).
+Differential regression (both cores): directed, the CSR/trap program (42/42),
+and linear + mixed (branch + CSR) random seeds. **Full-SoC differential test
+(`tb_soc`) passes** — the same programs (incl. the trap test, 42/42, and stores)
+run correctly through I$/D$ + the AXI4-Lite fabric, cold-miss fills included.
+
+**Measured PPA (real sky130, `sky130_fd_sc_hd__tt_025C_1v80`, Yosys map):**
+| metric | riscv_pipeline (CPU core) |
+|--------|---------------------------|
+| std cells | **15,342** |
+| cell area | **151,693 µm² ≈ 0.152 mm²** |
+| flip-flops | ~3,155 |
+
+Area shrank vs. the iteration-7 number (0.201 mm²) because the sequential
+multiplier removed the combinational 32×32 array. `make synth-sky130` /
+`tools/scripts/ppa.sh` reproduce it; timing closure (Fmax) and power are driven
+by `ppa.sh` through OpenSTA / the OpenROAD-OpenLane flow in `gds_flow/`.
+
+**Next bottleneck** — async interrupts (timer/CLINT) on top of the trap plumbing;
+caches use flop arrays (real chips use SRAM macros for the data RAM); no GPU/ARM
+core yet.
+
+---
+
 ## Backlog (ordered)
 0. ~~Branch prediction (BTB + 2-bit BHT)~~ ✅ (Iteration 4)
 00. ~~Physical synth (sky130 area) + UVM env + multi-cycle divider~~ ✅ (Iter 5-7)
 1. ~~Golden-trace co-sim harness~~ ✅ (Iteration 2)
 2. ~~5-stage pipeline: forwarding, load-use stall, branch flush~~ ✅ (Iteration 2)
 3. ~~DIV/REM (M-extension)~~ ✅ (Iteration 3) — now combinational; multi-cycle later.
-4. Randomized differential testing ✅ (Iteration 3) — extend with loads/stores+branches.
-4. CSR + minimal trap handling (mtvec/mepc/mcause) for compliance subset.
-5. AXI-lite memory slave + interconnect; swap TB BRAM for it via adapter.
-6. GPU SIMD lanes (vec add/mul/dot) sharing the AXI fabric.
-7. ARM-like educational core.
-8. OpenROAD P&R run from the Yosys netlist → GDS, timing/area reports.
+4. Randomized differential testing ✅ (Iteration 3) — + branches/CSRs (Iter 9).
+4. ~~CSR + machine-mode trap handling (mtvec/mepc/mcause, ECALL/EBREAK/MRET,
+   illegal + misaligned, mcycle/minstret)~~ ✅ (Iteration 9, both cores).
+5. ~~AXI4-Lite SRAM slave + I$/D$ + interconnect; full SoC, differential-tested~~
+   ✅ (Iteration 9).
+6. ~~Multi-cycle multiplier~~ ✅ (Iteration 9).
+7. Async interrupts (machine timer / CLINT) on top of the trap plumbing.
+8. GPU SIMD lanes (vec add/mul/dot) sharing the AXI fabric.
+9. ARM-like educational core.
+10. OpenROAD P&R run from the Yosys netlist → GDS, timing/area reports.

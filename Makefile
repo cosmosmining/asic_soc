@@ -81,5 +81,8 @@ synth:                      ## generic yosys synth/area for the pipeline
 synth-sky130:               ## map pipeline onto the real sky130 PDK
 	bash tools/scripts/synth_sky130.sh riscv_pipeline
 
+ppa:                        ## sky130 PPA (area + OpenSTA timing/power) for the CPU
+	bash tools/scripts/ppa.sh riscv_pipeline $(if $(PERIOD),$(PERIOD),12)
+
 clean:                      ## remove build artifacts
 	rm -rf $(BUILD) *.vcd *.vvp
