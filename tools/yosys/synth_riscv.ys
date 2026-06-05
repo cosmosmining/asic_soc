@@ -1,0 +1,21 @@
+# synth_riscv.ys - generic synthesis + sanity check for the RV32IM core.
+# Usage: yosys -s tools/yosys/synth_riscv.ys
+# A clean run is the synthesizability gate: any unsynthesizable construct or
+# undriven/multiply-driven net makes this fail. Prints cell/area statistics.
+
+read_verilog -sv -I rtl/common \
+    rtl/cpu_riscv/regfile.sv \
+    rtl/cpu_riscv/alu.sv \
+    rtl/cpu_riscv/riscv_core.sv
+
+hierarchy -check -top riscv_core
+
+# generic technology-independent synthesis
+synth -top riscv_core
+abc -g AND,OR,XOR,MUX
+opt -purge
+check -assert
+
+stat
+write_verilog -noattr build/riscv_core_netlist.v
+write_json build/riscv_core.json
