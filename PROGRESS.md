@@ -226,9 +226,34 @@ mtvec/mepc/mcause, ECALL/EBREAK/MRET), extending the golden model + UVM referenc
 
 ---
 
+## Iteration 8 — real RTL→GDSII (sky130, OpenLane on local Docker)
+
+**Goal (user ask):** actually run the physical flow to a GDS, locally.
+
+**Done**
+- Stood up headless Docker (**Colima** arm64 VM + Rosetta for the x86 OpenLane
+  image) — no Docker Desktop / GUI needed. Pulled OpenLane, installed sky130 PDK.
+- Ran OpenLane: synthesis → floorplan → placement → CTS → **detailed routing
+  (0 DRC violations)** → SPEF extraction → **GDSII** (streamed via Magic from the
+  clean routed DEF). Worked around 3 bugs in the `latest` dev image (unset
+  `GLB_RESIZER_TIMING_OPTIMIZATIONS`, unset `$::env(PWD)`, and a `/dev/null` RCX
+  save), plus relieved routing congestion (util 35→16%).
+
+**Result:** real **`gds_flow/gds/riscv_pipeline.gds.gz`** (112 MB → 20 MB),
+die **2.03 mm²**, router DRC **0 violations**, post-CTS timing **MET @50 MHz**
+(+6.52 ns slack). See `gds_flow/RESULTS.md`.
+
+**Honest caveats:** post-*route* timing not closed at 20 ns (the crashing timing
+resizer was disabled), and LVS not reached (dev-image bug). A stable OpenLane
+image would finish post-route opt + LVS. So: a real DRC-clean routed GDSII exists;
+it is **not** a fully signed-off tapeout.
+
+---
+
 ## Backlog (ordered)
 0. ~~Branch prediction (BTB + 2-bit BHT)~~ ✅ (Iteration 4)
 00. ~~Physical synth (sky130 area) + UVM env + multi-cycle divider~~ ✅ (Iter 5-7)
+000. ~~Real RTL→GDSII on local Docker (sky130/OpenLane)~~ ✅ (Iter 8)
 1. ~~Golden-trace co-sim harness~~ ✅ (Iteration 2)
 2. ~~5-stage pipeline: forwarding, load-use stall, branch flush~~ ✅ (Iteration 2)
 3. ~~DIV/REM (M-extension)~~ ✅ (Iteration 3) — now combinational; multi-cycle later.
