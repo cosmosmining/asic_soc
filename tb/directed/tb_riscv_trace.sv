@@ -74,6 +74,7 @@ module tb_riscv_trace;
 
     // ----------------------------------------------------- retire comparator
     int idx = 0, errors = 0;
+    int cycles = 0;                       // cycles elapsed since reset release
     initial begin
         $dumpfile("tb_riscv_trace.vcd");
         $dumpvars(0, tb_riscv_trace);
@@ -83,6 +84,7 @@ module tb_riscv_trace;
 
         forever begin
             @(posedge clk);
+            if (rst_n) cycles++;
             if (rst_n && rvfi_valid) begin
                 if (idx >= gold.n_exp) begin
                     // DUT retired more than expected before we stopped — ignore
@@ -112,6 +114,10 @@ module tb_riscv_trace;
     function void report_and_finish();
         $display("=== golden-trace differential test (%s) ===", MODE);
         $display("retired %0d/%0d instructions", idx, gold.n_exp);
+        // CPI = cycles from reset to last retire, per retired instruction.
+        if (idx > 0)
+            $display("PERF: %0d cycles, %0d retired, CPI=%0.3f",
+                     cycles, idx, real'(cycles) / real'(idx));
         // architectural memory spot-check (directed program only): store x5(=74)@0x100
         if (default_prog && mem[256>>2] !== 32'd74) begin
             errors++;

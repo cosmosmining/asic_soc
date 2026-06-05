@@ -2,4 +2,4 @@ build/
 *.vcd
 *.vvp
 *.log
-build/rand_*.hex
+build/*.hex

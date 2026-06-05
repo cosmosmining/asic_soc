@@ -112,7 +112,46 @@ then start the system side: an AXI-lite SRAM slave + a thin core→AXI adapter.
 
 ---
 
+## Iteration 4 — dynamic branch prediction (stronger CPU)
+
+**Goal:** raise pipeline throughput by removing the fixed 2-cycle taken-branch
+penalty. Architecturally transparent, so the existing golden-trace harness proves
+correctness for free (a mispredict only costs cycles, never changes results).
+
+**Changed**
+- `riscv_pipeline.sv`: added a direct-mapped **BTB + 2-bit BHT** branch predictor
+  (`BP_IDX_BITS`=4, 16 entries). Predict-taken redirects fetch early; EX compares
+  predicted-next-pc vs actual and flushes *only* on a real mismatch, then trains
+  BTB/BHT. Full-`pc[31:2]` tags ⇒ no cross-PC aliasing. `-DBP_OFF` reverts to the
+  static predict-not-taken baseline for A/B measurement.
+- TB: CPI instrumentation (cycles/retired). New benchmarks `loop_sum.hex`,
+  `loop_sum100.hex`. Generator gained safe forward-branch injection (`pbr` arg).
+
+**Verify** — directed + **100 linear random** + **60 branch-random** seeds, both
+cores: **all PASS**. Synthesis clean (netlist 1.35M→1.90M; predictor adds the BTB/BHT
+state + compare logic).
+
+**Measured (CPI, predict-not-taken → predictor)**
+| program                  | OFF   | ON    | Δ        |
+|--------------------------|-------|-------|----------|
+| loop_sum (10 iters)      | 1.618 | 1.206 | −25%     |
+| loop_sum100 (100 iters)  | 1.661 | 1.023 | **−38%** |
+| branch-random (1-shot)   | 1.290 | 1.290 | 0 (expected — single-visit branches can't be learned) |
+
+The predictor pays off on *repeated* branches (loops), driving CPI to ~1.02 — near
+the ideal — on the long loop.
+
+**Next bottleneck** — the combinational 32-bit divider is the worst critical-path /
+area offender; still no real memory subsystem (AXI), CSRs, or traps.
+
+**Next single-step action** — make division multi-cycle (iterative, with an EX stall)
+to shorten the critical path, OR start the AXI-lite memory subsystem. (Predictor is
+a clean, verified win; either is a good next step.)
+
+---
+
 ## Backlog (ordered)
+0. ~~Branch prediction (BTB + 2-bit BHT)~~ ✅ (Iteration 4)
 1. ~~Golden-trace co-sim harness~~ ✅ (Iteration 2)
 2. ~~5-stage pipeline: forwarding, load-use stall, branch flush~~ ✅ (Iteration 2)
 3. ~~DIV/REM (M-extension)~~ ✅ (Iteration 3) — now combinational; multi-cycle later.

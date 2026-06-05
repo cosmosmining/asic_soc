@@ -35,13 +35,40 @@ module riscv_pipeline #(
     // ============================================================ IF stage
     logic [XLEN-1:0] pc, pc_next;
     logic            stall;        // from hazard unit (freezes IF/ID + PC)
-    logic            redirect;     // from EX (taken branch/jump)
+    logic            redirect;     // from EX: branch mispredict, flush + recover
     logic [XLEN-1:0] redirect_pc;
 
+    // ---- dynamic branch predictor: direct-mapped BTB + 2-bit BHT ------------
+    // Tagged by the full pc[31:2], so a hit is always the exact same PC that
+    // trained it (no cross-PC aliasing) -> predictions only fire for real,
+    // previously-seen control transfers. Predict-taken redirects fetch early;
+    // EX checks predicted-next-pc vs actual and flushes only on a mismatch.
+    localparam int BPB = `BP_IDX_BITS;
+    localparam int BPN = 1 << BPB;
+    localparam int TAGW = XLEN - BPB - 2;
+    logic              btb_valid  [0:BPN-1];
+    logic              btb_uncond [0:BPN-1];
+    logic [XLEN-1:0]   btb_target [0:BPN-1];
+    logic [TAGW-1:0]   btb_tag    [0:BPN-1];
+    logic [1:0]        bht        [0:BPN-1];
+
+    logic [BPB-1:0]    if_idx;
+    logic              predict_taken;
+    logic [XLEN-1:0]   predict_target;
+    assign if_idx         = pc[BPB+1:2];
+    wire   if_hit         = btb_valid[if_idx] && (btb_tag[if_idx] == pc[XLEN-1:BPB+2]);
+`ifdef BP_OFF
+    assign predict_taken  = 1'b0;        // baseline: static predict-not-taken
+`else
+    assign predict_taken  = if_hit && (btb_uncond[if_idx] || bht[if_idx][1]);
+`endif
+    assign predict_target = btb_target[if_idx];
+
     always_comb begin
-        if      (redirect) pc_next = redirect_pc;
-        else if (stall)    pc_next = pc;
-        else               pc_next = pc + 32'd4;
+        if      (redirect)       pc_next = redirect_pc;     // mispredict recovery
+        else if (stall)          pc_next = pc;              // load-use hold
+        else if (predict_taken)  pc_next = predict_target;  // predicted taken
+        else                     pc_next = pc + 32'd4;
     end
 
     always_ff @(posedge clk or negedge rst_n) begin
@@ -55,21 +82,27 @@ module riscv_pipeline #(
     logic            de_valid;
     logic [XLEN-1:0] de_pc;
     logic [31:0]     de_inst;
+    logic            de_pred_taken;     // prediction made for this fetch
+    logic [XLEN-1:0] de_pred_target;
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            de_valid <= 1'b0;
-            de_pc    <= '0;
-            de_inst  <= 32'h0;
+            de_valid      <= 1'b0;
+            de_pc         <= '0;
+            de_inst       <= 32'h0;
+            de_pred_taken <= 1'b0;
         end else if (redirect) begin
-            de_valid <= 1'b0;          // flush younger instruction
-            de_inst  <= 32'h0;
+            de_valid      <= 1'b0;      // flush younger (wrong-path) instruction
+            de_inst       <= 32'h0;
+            de_pred_taken <= 1'b0;
         end else if (stall) begin
             // hold IF/ID
         end else begin
-            de_valid <= 1'b1;
-            de_pc    <= pc;
-            de_inst  <= imem_rdata;
+            de_valid       <= 1'b1;
+            de_pc          <= pc;
+            de_inst        <= imem_rdata;
+            de_pred_taken  <= predict_taken;
+            de_pred_target <= predict_target;
         end
     end
 
@@ -206,6 +239,8 @@ module riscv_pipeline #(
     logic            ex_reg_write, ex_alu_src_imm, ex_mem_read, ex_mem_write;
     logic            ex_branch, ex_jump, ex_jalr, ex_use_pc;
     logic            ex_uses_rs1, ex_uses_rs2;
+    logic            ex_pred_taken;
+    logic [XLEN-1:0] ex_pred_target;
 
     // bubble when stalling (load-use) or flushing (redirect kills de).
     // Kept as a *synchronous* clear, separate from the async reset, so DFF
@@ -222,6 +257,7 @@ module riscv_pipeline #(
             ex_jump       <= 1'b0;
             ex_jalr       <= 1'b0;
             ex_rd         <= 5'd0;
+            ex_pred_taken <= 1'b0;
         end else if (ex_bubble) begin
             ex_valid      <= 1'b0;
             ex_reg_write  <= 1'b0;
@@ -231,7 +267,10 @@ module riscv_pipeline #(
             ex_jump       <= 1'b0;
             ex_jalr       <= 1'b0;
             ex_rd         <= 5'd0;
+            ex_pred_taken <= 1'b0;
         end else begin
+            ex_pred_taken <= de_pred_taken;
+            ex_pred_target<= de_pred_target;
             ex_valid      <= de_valid;
             ex_pc         <= de_pc;
             ex_rs1_data   <= rf_rs1;
@@ -313,11 +352,45 @@ module riscv_pipeline #(
         end
     end
 
-    assign redirect    = ex_valid && (ex_jump || (ex_branch && take_branch));
+    // actual control outcome
+    wire             ex_is_ctrl   = ex_branch || ex_jump;
+    wire             actual_taken = ex_jump || (ex_branch && take_branch);
+    logic [XLEN-1:0] actual_target;
     always_comb begin
-        if      (ex_jalr) redirect_pc = (fwd_a + ex_imm_alu) & ~32'h1;
-        else if (ex_jump) redirect_pc = ex_pc + ex_imm_j;       // JAL
-        else              redirect_pc = ex_pc + ex_imm_b;       // taken branch
+        if      (ex_jalr) actual_target = (fwd_a + ex_imm_alu) & ~32'h1;
+        else if (ex_jump) actual_target = ex_pc + ex_imm_j;     // JAL
+        else              actual_target = ex_pc + ex_imm_b;     // taken branch
+    end
+    wire [XLEN-1:0] actual_nextpc = actual_taken    ? actual_target  : (ex_pc + 32'd4);
+    wire [XLEN-1:0] pred_nextpc   = ex_pred_taken   ? ex_pred_target : (ex_pc + 32'd4);
+
+    // Flush only when the fetched-next-pc disagrees with the real next-pc.
+    assign redirect    = ex_valid && (actual_nextpc != pred_nextpc);
+    assign redirect_pc = actual_nextpc;
+
+    // ---- predictor update (train BTB/BHT on resolved control transfers) -----
+    wire [BPB-1:0] ex_idx = ex_pc[BPB+1:2];
+    integer bi;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            for (bi = 0; bi < BPN; bi = bi + 1) begin
+                btb_valid[bi]  <= 1'b0;
+                btb_uncond[bi] <= 1'b0;
+                bht[bi]        <= 2'b01;     // weakly not-taken
+            end
+        end else if (ex_valid && ex_is_ctrl) begin
+            if (actual_taken) begin          // allocate / refresh target on taken
+                btb_valid[ex_idx]  <= 1'b1;
+                btb_uncond[ex_idx] <= ex_jump;
+                btb_tag[ex_idx]    <= ex_pc[XLEN-1:BPB+2];
+                btb_target[ex_idx] <= actual_target;
+            end
+            // 2-bit saturating counter (branches only; jumps use the uncond bit)
+            if (ex_branch) begin
+                if (actual_taken) bht[ex_idx] <= (bht[ex_idx] == 2'b11) ? 2'b11 : bht[ex_idx] + 2'b01;
+                else              bht[ex_idx] <= (bht[ex_idx] == 2'b00) ? 2'b00 : bht[ex_idx] - 2'b01;
+            end
+        end
     end
 
     // load-use hazard: a load in EX feeding a source of the instr in ID

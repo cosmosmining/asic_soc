@@ -50,15 +50,36 @@ def i_type(f3, rd, rs1, imm):
     return ((imm & 0xFFF) << 20) | (rs1 << 15) | (f3 << 12) | (rd << 7) | OPC_OPIMM
 
 
+OPC_BRANCH = 0x63
+B_F3 = [0x0, 0x1, 0x4, 0x5, 0x6, 0x7]  # beq bne blt bge bltu bgeu
+
+
+def b_type(f3, rs1, rs2, off):         # off is a byte offset, multiple of 2
+    o = off & 0x1FFF
+    imm12, imm11 = (o >> 12) & 1, (o >> 11) & 1
+    imm105, imm41 = (o >> 5) & 0x3F, (o >> 1) & 0xF
+    return ((imm12 << 31) | (imm105 << 25) | (rs2 << 20) | (rs1 << 15) |
+            (f3 << 12) | (imm41 << 8) | (imm11 << 7) | OPC_BRANCH)
+
+
 def main():
     seed = int(sys.argv[1]) if len(sys.argv) > 1 else 0
     n = int(sys.argv[2]) if len(sys.argv) > 2 else 64
+    # 3rd arg: probability of injecting a *forward* branch (default 0 = linear).
+    pbr = float(sys.argv[3]) if len(sys.argv) > 3 else 0.0
     random.seed(seed)
 
     words = []
-    for _ in range(n):
+    for i in range(n):
         rd, rs1, rs2 = (random.randint(0, 31) for _ in range(3))
-        if random.random() < 0.5:
+        # Forward-only branches with a small bounded offset keep the program
+        # terminating and in-bounds (target is always a later real instruction,
+        # never past the trailing halt) while exercising the predictor.
+        max_skip = (n - 1) - i            # words remaining before the halt
+        if pbr > 0 and max_skip >= 2 and random.random() < pbr:
+            skip = random.randint(1, min(3, max_skip))   # skip 1..3 instrs
+            words.append(b_type(random.choice(B_F3), rs1, rs2, 4 * skip))
+        elif random.random() < 0.5:
             f7, f3 = random.choice(R_OPS)
             words.append(r_type(f7, f3, rd, rs1, rs2))
         else:
