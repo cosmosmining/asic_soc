@@ -3,3 +3,5 @@ build/
 *.vvp
 *.log
 build/*.hex
+tools/.venv/
+tools/pdk/
