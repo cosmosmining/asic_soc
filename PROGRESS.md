@@ -38,9 +38,48 @@ comparator (golden model) so the pipeline refactor in Iteration 2 is regression-
 
 ---
 
+## Iteration 2 — golden-trace harness + 5-stage pipeline
+
+**Goal:** make the design regression-safe, then add the pipeline with hazard handling.
+
+**Changed**
+- RVFI-lite retire interface added to `riscv_core` (registered commit record).
+- `tb/directed/riscv_golden.sv` — independent behavioral RV32IM ISS that emits the
+  expected retire trace (a *separate* implementation, for differential testing).
+- `tb/directed/tb_riscv_trace.sv` — order-based retire comparator; one TB validates
+  both cores (`-DPIPELINE` switch). `tb/directed/programs/test_core.hex` exercises
+  EX-forwarding chains, a load-use hazard, and branch taken/not-taken.
+- `rtl/cpu_riscv/riscv_pipeline.sv` — **5-stage IF/ID/EX/MEM/WB pipeline**: full EX
+  forwarding (EX/MEM + MEM/WB), load-use stall+bubble, branch/jump resolved in EX
+  with 2-cycle flush, regfile write-first bypass. Same ports as `riscv_core`.
+- `tools/yosys/synth_pipeline.ys`; runner now auto-includes TB helper modules and
+  forwards defines (`-DPIPELINE`).
+
+**Verify** — golden-trace differential test:
+- single-cycle: **PASS 14/14**, pipeline: **PASS 14/14** (same golden model).
+
+**Synthesize** — `synth_pipeline.ys`: clean, `check -assert` ok, netlist written
+(~23k generic cells incl. expanded multiplier).
+
+**What broke / fixed**
+1. *TB bug:* hand-encoded `addi x6` as rd=x5 (clobbered a result). Golden+DUT agreed
+   (same hex) so the trace stayed green — caught only by the architectural mem check.
+   Fixed the hex word.
+2. *RTL/synth bug:* ID/EX bubble used `if(!rst_n || ex_bubble)`, ORing a synchronous
+   clear with the async reset → Yosys "Multiple edge sensitive events". Split into
+   async-reset branch + synchronous-bubble branch. Re-verified + synthesized clean.
+
+**Next bottleneck** — M-extension is incomplete (DIV/REM are ADD placeholders); the
+verification is directed-only (no randomized differential stress).
+
+**Next single-step action** — add DIV/REM to the ALU + golden model, then a randomized
+instruction-stream differential test (constrained-random) reusing the golden ISS.
+
+---
+
 ## Backlog (ordered)
-1. Golden-trace co-sim harness for the core (regression safety net).
-2. 5-stage pipeline: stage regs, forwarding unit, load-use stall, branch flush.
+1. ~~Golden-trace co-sim harness~~ ✅ (Iteration 2)
+2. ~~5-stage pipeline: forwarding, load-use stall, branch flush~~ ✅ (Iteration 2)
 3. DIV/REM (M-extension) — currently placeholder.
 4. CSR + minimal trap handling (mtvec/mepc/mcause) for compliance subset.
 5. AXI-lite memory slave + interconnect; swap TB BRAM for it via adapter.

@@ -23,7 +23,13 @@ module riscv_core #(
     output logic            dmem_we,
     input  logic [XLEN-1:0] dmem_rdata,
     // debug visibility
-    output logic [XLEN-1:0] dbg_pc
+    output logic [XLEN-1:0] dbg_pc,
+    // RVFI-lite retire interface (registered; one record per committed instr)
+    output logic            rvfi_valid,
+    output logic [XLEN-1:0] rvfi_pc,
+    output logic [4:0]      rvfi_rd,
+    output logic            rvfi_we,
+    output logic [XLEN-1:0] rvfi_wdata
 );
     // ---------------------------------------------------------------- PC
     logic [XLEN-1:0] pc, pc_next, pc_plus4;
@@ -285,5 +291,24 @@ module riscv_core #(
             2'd2:    wb_data = pc_plus4;    // JAL/JALR link
             default: wb_data = alu_y;
         endcase
+    end
+
+    // ----------------------------------------------------- retire (RVFI-lite)
+    // Registered so external monitors sample a stable, race-free commit record.
+    // Single-cycle: exactly one instruction commits each cycle out of reset.
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            rvfi_valid <= 1'b0;
+            rvfi_pc    <= '0;
+            rvfi_rd    <= '0;
+            rvfi_we    <= 1'b0;
+            rvfi_wdata <= '0;
+        end else begin
+            rvfi_valid <= 1'b1;
+            rvfi_pc    <= pc;
+            rvfi_rd    <= rd;
+            rvfi_we    <= reg_write && (rd != 5'd0);
+            rvfi_wdata <= (reg_write && rd != 5'd0) ? wb_data : '0;
+        end
     end
 endmodule

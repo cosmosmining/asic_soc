@@ -10,8 +10,10 @@ shift || true
 BUILD="$ROOT/build"
 mkdir -p "$BUILD"
 
-# Gather sources: all synthesizable RTL + the requested TB file.
+# Gather sources: all synthesizable RTL, shared TB helpers (tb files NOT named
+# tb_*, e.g. golden models), and the requested TB top.
 RTL_FILES=$(find "$ROOT/rtl" -name '*.sv' | sort)
+TB_HELPERS=$(find "$ROOT/tb" -name '*.sv' ! -name 'tb_*' | sort)
 TB_FILE=$(find "$ROOT/tb" -name "${TB_TOP}.sv" | head -1)
 
 if [[ -z "${TB_FILE}" ]]; then
@@ -19,12 +21,14 @@ if [[ -z "${TB_FILE}" ]]; then
     exit 1
 fi
 
+# Forwarded args (e.g. -DPIPELINE) must sit among the flags, before sources.
 echo ">> compiling ${TB_TOP}"
 iverilog -g2012 -gsupported-assertions \
     -I "$ROOT/rtl/common" \
+    "$@" \
     -s "${TB_TOP}" \
     -o "$BUILD/${TB_TOP}.vvp" \
-    ${RTL_FILES} "${TB_FILE}" "$@"
+    ${RTL_FILES} ${TB_HELPERS} "${TB_FILE}"
 
 echo ">> running ${TB_TOP}"
 vvp "$BUILD/${TB_TOP}.vvp"

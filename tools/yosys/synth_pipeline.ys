@@ -1,0 +1,14 @@
+# synth_pipeline.ys - generic synthesis + sanity check for the 5-stage pipeline.
+# Usage: yosys -s tools/yosys/synth_pipeline.ys
+read_verilog -sv -I rtl/common \
+    rtl/cpu_riscv/regfile.sv \
+    rtl/cpu_riscv/alu.sv \
+    rtl/cpu_riscv/riscv_pipeline.sv
+
+hierarchy -check -top riscv_pipeline
+synth -top riscv_pipeline
+abc -g AND,OR,XOR,MUX
+opt -purge
+check -assert
+stat
+write_verilog -noattr build/riscv_pipeline_netlist.v
