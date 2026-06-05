@@ -62,11 +62,23 @@ def b_type(f3, rs1, rs2, off):         # off is a byte offset, multiple of 2
             (f3 << 12) | (imm41 << 8) | (imm11 << 7) | OPC_BRANCH)
 
 
+OPC_SYSTEM = 0x73
+CSR_F3 = [0x1, 0x2, 0x3]               # csrrw / csrrs / csrrc
+MSCRATCH = 0x340                       # a plain R/W CSR: side-effect-free, so a
+                                       # read/write stream is fully architectural
+
+
+def csr_type(f3, rd, rs1, addr):
+    return ((addr & 0xFFF) << 20) | (rs1 << 15) | (f3 << 12) | (rd << 7) | OPC_SYSTEM
+
+
 def main():
     seed = int(sys.argv[1]) if len(sys.argv) > 1 else 0
     n = int(sys.argv[2]) if len(sys.argv) > 2 else 64
     # 3rd arg: probability of injecting a *forward* branch (default 0 = linear).
     pbr = float(sys.argv[3]) if len(sys.argv) > 3 else 0.0
+    # 4th arg: probability of injecting a mscratch CSR op (default 0).
+    pcsr = float(sys.argv[4]) if len(sys.argv) > 4 else 0.0
     random.seed(seed)
 
     words = []
@@ -76,7 +88,11 @@ def main():
         # terminating and in-bounds (target is always a later real instruction,
         # never past the trailing halt) while exercising the predictor.
         max_skip = (n - 1) - i            # words remaining before the halt
-        if pbr > 0 and max_skip >= 2 and random.random() < pbr:
+        if pcsr > 0 and random.random() < pcsr:
+            # mscratch read/modify/write: stresses CSR-result forwarding and
+            # back-to-back CSR hazards. Architectural, so the golden matches.
+            words.append(csr_type(random.choice(CSR_F3), rd, rs1, MSCRATCH))
+        elif pbr > 0 and max_skip >= 2 and random.random() < pbr:
             skip = random.randint(1, min(3, max_skip))   # skip 1..3 instrs
             words.append(b_type(random.choice(B_F3), rs1, rs2, 4 * skip))
         elif random.random() < 0.5:

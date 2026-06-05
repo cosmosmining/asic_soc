@@ -1,0 +1,21 @@
+// lint_waivers.vlt - Verilator lint waivers with justification.
+//
+// Passed to `verilator --lint-only` (see Makefile `lint` target). Only
+// *intentional* design facts are waived here; every waiver names why the
+// signal is legitimately partially-unused. Anything not listed must lint clean.
+`verilator_config
+
+// alu.sv: the M-extension multiplies form full 2*XLEN products but each result
+// op consumes only one half (MUL -> low, MULH/MULHSU/MULHU -> high). The unused
+// halves are real, intended don't-cares; synthesis prunes them.
+lint_off -rule UNUSEDSIGNAL -file "*/alu.sv" -match "*'mul_uu'*"
+lint_off -rule UNUSEDSIGNAL -file "*/alu.sv" -match "*'mul_su'*"
+lint_off -rule UNUSEDSIGNAL -file "*/alu.sv" -match "*'mul_ss'*"
+
+// divider.sv: `rem` carries one extra guard bit [XLEN] for the shift-compare in
+// CALC; the final remainder only reads [XLEN-1:0]. The guard bit is by design.
+lint_off -rule UNUSEDSIGNAL -file "*/divider.sv" -match "*'rem'*"
+
+// csr.sv: mepc enforces IALIGN=32 by forcing bit 0 of the trapped PC to 0
+// ({trap_epc[XLEN-1:1],1'b0}); trap_epc[0] is intentionally dropped.
+lint_off -rule UNUSEDSIGNAL -file "*/csr.sv" -match "*'trap_epc'*"

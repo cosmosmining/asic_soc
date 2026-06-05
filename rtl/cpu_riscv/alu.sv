@@ -6,7 +6,8 @@
 
 module alu #(
     parameter int XLEN    = 32,
-    parameter bit HAS_DIV = 1'b1
+    parameter bit HAS_DIV = 1'b1,
+    parameter bit HAS_MUL = 1'b1
 ) (
     input  logic [4:0]       op,
     input  logic [XLEN-1:0]  a,
@@ -17,11 +18,34 @@ module alu #(
     logic signed [XLEN-1:0]   as, bs;
     assign as = a;
     assign bs = b;
-    logic [2*XLEN-1:0]        mul_uu;
-    logic signed [2*XLEN-1:0] mul_ss;
-    logic signed [2*XLEN-1:0] mul_su;
 
     localparam logic [XLEN-1:0] MIN_S = {1'b1, {(XLEN-1){1'b0}}};
+
+    // Optional combinational multiplier (single-cycle core only). When HAS_MUL=0
+    // (pipeline) MUL/MULH/MULHSU/MULHU are handled by the external sequential
+    // unit and no 32x32 multiply hardware is inferred here.
+    logic [XLEN-1:0] mul_y;
+    generate
+        if (HAS_MUL) begin : g_mul
+            logic [2*XLEN-1:0]        mul_uu;
+            logic signed [2*XLEN-1:0] mul_ss;
+            logic signed [2*XLEN-1:0] mul_su;
+            always_comb begin
+                mul_uu = a  * b;                      // unsigned x unsigned
+                mul_ss = as * bs;                     // signed x signed
+                mul_su = as * $signed({1'b0, b});     // signed x unsigned
+                unique case (op)
+                    `ALU_MUL:   mul_y = mul_ss[XLEN-1:0];
+                    `ALU_MULH:  mul_y = mul_ss[2*XLEN-1:XLEN];
+                    `ALU_MULHSU:mul_y = mul_su[2*XLEN-1:XLEN];
+                    `ALU_MULHU: mul_y = mul_uu[2*XLEN-1:XLEN];
+                    default:    mul_y = '0;
+                endcase
+            end
+        end else begin : g_nomul
+            assign mul_y = '0;        // pipeline: multiply done by external unit
+        end
+    endgenerate
 
     // Optional combinational divide unit (single-cycle core only).
     logic [XLEN-1:0] div_y;
@@ -45,10 +69,6 @@ module alu #(
     endgenerate
 
     always_comb begin
-        mul_uu = a  * b;                                  // unsigned x unsigned
-        mul_ss = as * bs;                                 // signed x signed
-        mul_su = as * $signed({1'b0, b});                 // signed x unsigned
-
         unique case (op)
             `ALU_ADD:   y = a + b;
             `ALU_SUB:   y = a - b;
@@ -60,10 +80,7 @@ module alu #(
             `ALU_SRA:   y = as >>> b[4:0];
             `ALU_OR:    y = a | b;
             `ALU_AND:   y = a & b;
-            `ALU_MUL:   y = mul_ss[XLEN-1:0];
-            `ALU_MULH:  y = mul_ss[2*XLEN-1:XLEN];
-            `ALU_MULHSU:y = mul_su[2*XLEN-1:XLEN];
-            `ALU_MULHU: y = mul_uu[2*XLEN-1:XLEN];
+            `ALU_MUL, `ALU_MULH, `ALU_MULHSU, `ALU_MULHU: y = mul_y;
             `ALU_PASSB: y = b;
             `ALU_DIV, `ALU_DIVU, `ALU_REM, `ALU_REMU: y = div_y;
             default:    y = '0;
