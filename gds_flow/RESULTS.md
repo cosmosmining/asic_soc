@@ -20,6 +20,7 @@ on the SkyWater **sky130** PDK, run locally via a headless Colima Docker VM
 - **Placement density:** ~16% (deliberately low to relieve routing congestion)
 - **Wire length:** 2.08 mm-scale (2,082,265 DBU·tracks), **286,769 vias**
 - **Router DRC (TritonRoute):** **0 violations**
+- **Magic full-chip sign-off DRC:** **0 violations** (independent second checker)
 - **Post-CTS timing:** **MET** — WNS/TNS 0.0, worst setup slack **+6.52 ns** @ 20 ns (50 MHz)
 
 ## Honest caveats (not a signed-off tapeout)
