@@ -135,7 +135,7 @@ module riscv_golden #(
             endcase
 
             if (!legal) begin
-                trap = 1'b1; tcause = 32'd2; ttval = inst;            // illegal instruction
+                trap = 1'b1; tcause = 32'd2; ttval = 32'h0;           // illegal instruction
             end else begin
                 case (opc)
                 7'b0110111: begin we = 1'b1; res = imm_u; end                 // LUI
@@ -277,7 +277,7 @@ module riscv_golden #(
                                   (f3[2] ? (rs1 != 5'd0) : (rs1 != 5'd0));   // RS/RC: src reg/uimm != 0
                         csr_ro  = (csr_a[11:10] == 2'b11);
                         if (!csr_impl || (csr_wen && csr_ro)) begin
-                            trap=1'b1; tcause=32'd2; ttval=inst;             // illegal
+                            trap=1'b1; tcause=32'd2; ttval=32'h0;            // illegal
                         end else begin
                             // read current value
                             case (csr_a)

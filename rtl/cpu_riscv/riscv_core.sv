@@ -301,8 +301,8 @@ module riscv_core #(
     assign insn_ma = take_ctrl && (ctrl_target[1:0] != 2'b00);
     always_comb begin
         trap = 1'b1;
-        if      (!legal)                begin trap_cause = `CAUSE_ILLEGAL_INSN;  trap_tval = inst; end
-        else if (is_csr && csr_illegal) begin trap_cause = `CAUSE_ILLEGAL_INSN;  trap_tval = inst; end
+        if      (!legal)                begin trap_cause = `CAUSE_ILLEGAL_INSN;  trap_tval = '0; end
+        else if (is_csr && csr_illegal) begin trap_cause = `CAUSE_ILLEGAL_INSN;  trap_tval = '0; end
         else if (insn_ma)               begin trap_cause = `CAUSE_INSN_MISALIGN; trap_tval = ctrl_target; end
         else if (ld_ma)                 begin trap_cause = `CAUSE_LOAD_MISALIGN; trap_tval = mem_addr; end
         else if (st_ma)                 begin trap_cause = `CAUSE_STORE_MISALIGN;trap_tval = mem_addr; end
