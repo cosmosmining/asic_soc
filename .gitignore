@@ -6,3 +6,6 @@ build/*.hex
 tools/.venv/
 tools/pdk/
 tools/OpenLane/
+__pycache__/
+*.pyc
+.pytest_cache/

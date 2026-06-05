@@ -1,0 +1,98 @@
+************************************************************************
+Report : timing
+        -path_type full_clock_expanded
+        -delay_type max
+        -max_paths 200
+        -sort_by slack
+Design : riscv_pipeline
+Version: T-2022.03-SP5
+************************************************************************
+
+Operating Conditions: tt_025C_1v80   Library: sky130_fd_sc_hd__tt_025C_1v80
+
+  Startpoint: u_div/quotient_reg[31]
+              (rising edge-triggered flip-flop clocked by clk)
+  Endpoint: u_alu/result_reg[31]
+            (rising edge-triggered flip-flop clocked by clk)
+  Path Group: clk
+  Path Type: max
+
+  Point                                                            Incr       Path 
+  --------------------------------------------------------------------------------
+  clock clk (rise edge)                                          0.0000     0.0000
+  clock network delay (ideal)                                    0.0000     0.0000
+  u_div/quotient_reg[31]/CK (sky130_fd_sc_hd__dfrtp_1)           0.0000     0.0000 r
+  u_div/quotient_reg[31]/Q (sky130_fd_sc_hd__dfrtp_1)            0.4000     0.4000 r
+  u_div/_cp_0000/A (sky130_fd_sc_hd__xnor2_1)                    0.4500     0.8500 r
+  u_div/_cp_0000/Y (sky130_fd_sc_hd__xnor2_1)                    0.5500     1.4000 f
+  u_div/_cp_0001/A (sky130_fd_sc_hd__xnor2_1)                    0.4500     1.8500 r
+  u_div/_cp_0001/Y (sky130_fd_sc_hd__xnor2_1)                    0.5500     2.4000 f
+  u_div/_cp_0002/A (sky130_fd_sc_hd__xnor2_1)                    0.4500     2.8500 r
+  u_div/_cp_0002/Y (sky130_fd_sc_hd__xnor2_1)                    0.5500     3.4000 f
+  u_div/_cp_0003/A (sky130_fd_sc_hd__xnor2_1)                    0.4500     3.8500 r
+  u_div/_cp_0003/Y (sky130_fd_sc_hd__xnor2_1)                    0.5500     4.4000 f
+  u_div/_cp_0004/A (sky130_fd_sc_hd__xnor2_1)                    0.4500     4.8500 r
+  u_div/_cp_0004/Y (sky130_fd_sc_hd__xnor2_1)                    0.5500     5.4000 f
+  u_div/_cp_0005/A (sky130_fd_sc_hd__xnor2_1)                    0.4500     5.8500 r
+  u_div/_cp_0005/Y (sky130_fd_sc_hd__xnor2_1)                    0.5500     6.4000 f
+  u_div/_cp_0006/A (sky130_fd_sc_hd__xnor2_1)                    0.4500     6.8500 r
+  u_div/_cp_0006/Y (sky130_fd_sc_hd__xnor2_1)                    0.5500     7.4000 f
+  u_div/_cp_0007/A (sky130_fd_sc_hd__xnor2_1)                    0.4500     7.8500 r
+  u_div/_cp_0007/Y (sky130_fd_sc_hd__xnor2_1)                    0.5500     8.4000 f
+  u_div/_cp_0008/A (sky130_fd_sc_hd__xnor2_1)                    0.4500     8.8500 r
+  u_div/_cp_0008/Y (sky130_fd_sc_hd__xnor2_1)                    0.5500     9.4000 f
+  u_div/_cp_0009/A (sky130_fd_sc_hd__xnor2_1)                    0.4500     9.8500 r
+  u_div/_cp_0009/Y (sky130_fd_sc_hd__xnor2_1)                    0.5500    10.4000 f
+  u_div/_cp_0010/A (sky130_fd_sc_hd__xnor2_1)                    0.4500    10.8500 r
+  u_div/_cp_0010/Y (sky130_fd_sc_hd__xnor2_1)                    0.5500    11.4000 f
+  u_div/_cp_0011/A (sky130_fd_sc_hd__xnor2_1)                    0.4500    11.8500 r
+  u_div/_cp_0011/Y (sky130_fd_sc_hd__xnor2_1)                    0.5500    12.4000 f
+  u_alu/result_reg[31]/D (sky130_fd_sc_hd__dfxtp_1)              0.9300    13.3300 f
+  data arrival time                                                        13.3300
+
+  clock clk (rise edge)                                         20.0000    20.0000
+  clock network delay (ideal)                                    0.0000    20.0000
+  u_alu/result_reg[31]/CK (sky130_fd_sc_hd__dfxtp_1)             0.0000    20.0000 r
+  clock uncertainty                                             -0.0000    20.0000
+  library setup time                                            -0.1500    19.8500
+  data required time                                                       19.8500
+  --------------------------------------------------------------------------------
+  data required time                                                       19.8500
+  data arrival time                                                       -13.3300
+  --------------------------------------------------------------------------------
+  slack (MET)                                                               6.5200
+
+  Startpoint: u_idex/ctrl_reg[1]
+              (rising edge-triggered flip-flop clocked by clk)
+  Endpoint: u_exmem/ctrl_reg[1]
+            (rising edge-triggered flip-flop clocked by clk)
+  Path Group: clk
+  Path Type: max
+
+  Point                                                            Incr       Path 
+  --------------------------------------------------------------------------------
+  clock clk (rise edge)                                          0.0000     0.0000
+  clock network delay (ideal)                                    0.0000     0.0000
+  u_idex/ctrl_reg[1]/CK (sky130_fd_sc_hd__dfrtp_1)               0.0000     0.0000 r
+  u_idex/ctrl_reg[1]/Q (sky130_fd_sc_hd__dfrtp_1)                0.4000     0.4000 r
+  u_ctrl/_s_0000/A (sky130_fd_sc_hd__and2_0)                     0.1000     0.5000 r
+  u_ctrl/_s_0000/X (sky130_fd_sc_hd__and2_0)                     0.2000     0.7000 f
+  u_ctrl/_s_0001/A (sky130_fd_sc_hd__and2_0)                     0.1000     0.8000 r
+  u_ctrl/_s_0001/X (sky130_fd_sc_hd__and2_0)                     0.2000     1.0000 f
+  u_ctrl/_s_0002/A (sky130_fd_sc_hd__and2_0)                     0.1000     1.1000 r
+  u_ctrl/_s_0002/X (sky130_fd_sc_hd__and2_0)                     0.2000     1.3000 f
+  u_exmem/ctrl_reg[1]/D (sky130_fd_sc_hd__dfxtp_1)               0.1200     1.4200 f
+  data arrival time                                                         1.4200
+
+  clock clk (rise edge)                                         20.0000    20.0000
+  clock network delay (ideal)                                    0.0000    20.0000
+  u_exmem/ctrl_reg[1]/CK (sky130_fd_sc_hd__dfxtp_1)              0.0000    20.0000 r
+  clock uncertainty                                             -0.0000    20.0000
+  library setup time                                            -0.1500    19.8500
+  data required time                                                       19.8500
+  --------------------------------------------------------------------------------
+  data required time                                                       19.8500
+  data arrival time                                                        -1.4200
+  --------------------------------------------------------------------------------
+  slack (MET)                                                              18.4300
+

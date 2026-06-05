@@ -1,0 +1,284 @@
+************************************************************************
+Report : timing
+        -path_type full_clock_expanded
+        -delay_type max
+        -max_paths 200
+        -sort_by slack
+Design : riscv_pipeline
+Version: T-2022.03-SP5
+************************************************************************
+
+Operating Conditions: ss_100C_1v60   Library: sky130_fd_sc_hd__ss_100C_1v60
+
+  Startpoint: u_div/quotient_reg[18]
+              (rising edge-triggered flip-flop clocked by clk)
+  Endpoint: u_alu/result_reg[7]
+            (rising edge-triggered flip-flop clocked by clk)
+  Path Group: clk
+  Path Type: max
+
+  Point                                                            Incr       Path 
+  --------------------------------------------------------------------------------
+  clock clk (rise edge)                                          0.0000     0.0000
+  clock network delay (ideal)                                    0.0000     0.0000
+  u_div/quotient_reg[18]/CK (sky130_fd_sc_hd__dfrtp_1)           0.0000     0.0000 r
+  u_div/quotient_reg[18]/Q (sky130_fd_sc_hd__dfrtp_1)            0.4000     0.4000 r
+  u_div/_dz_0000/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     0.4450 r
+  u_div/_dz_0000/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     0.5950 f
+  u_div/_dz_0001/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     0.6400 r
+  u_div/_dz_0001/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     0.7900 f
+  u_div/_dz_0002/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     0.8350 r
+  u_div/_dz_0002/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     0.9850 f
+  u_div/_dz_0003/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     1.0300 r
+  u_div/_dz_0003/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     1.1800 f
+  u_div/_dz_0004/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     1.2250 r
+  u_div/_dz_0004/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     1.3750 f
+  u_div/_dz_0005/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     1.4200 r
+  u_div/_dz_0005/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     1.5700 f
+  u_div/_dz_0006/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     1.6150 r
+  u_div/_dz_0006/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     1.7650 f
+  u_div/_dz_0007/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     1.8100 r
+  u_div/_dz_0007/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     1.9600 f
+  u_div/_dz_0008/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     2.0050 r
+  u_div/_dz_0008/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     2.1550 f
+  u_div/_dz_0009/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     2.2000 r
+  u_div/_dz_0009/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     2.3500 f
+  u_div/_dz_0010/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     2.3950 r
+  u_div/_dz_0010/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     2.5450 f
+  u_div/_dz_0011/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     2.5900 r
+  u_div/_dz_0011/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     2.7400 f
+  u_div/_dz_0012/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     2.7850 r
+  u_div/_dz_0012/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     2.9350 f
+  u_div/_dz_0013/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     2.9800 r
+  u_div/_dz_0013/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     3.1300 f
+  u_div/_dz_0014/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     3.1750 r
+  u_div/_dz_0014/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     3.3250 f
+  u_div/_dz_0015/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     3.3700 r
+  u_div/_dz_0015/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     3.5200 f
+  u_div/_dz_0016/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     3.5650 r
+  u_div/_dz_0016/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     3.7150 f
+  u_div/_dz_0017/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     3.7600 r
+  u_div/_dz_0017/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     3.9100 f
+  u_div/_dz_0018/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     3.9550 r
+  u_div/_dz_0018/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     4.1050 f
+  u_div/_dz_0019/A (sky130_fd_sc_hd__xnor2_1)                    0.0450     4.1500 r
+  u_div/_dz_0019/Y (sky130_fd_sc_hd__xnor2_1)                    0.1500     4.3000 f
+  u_alu/result_reg[7]/D (sky130_fd_sc_hd__dfxtp_1)               0.1000     4.4000 f
+  data arrival time                                                         4.4000
+
+  clock clk (rise edge)                                          4.0000     4.0000
+  clock network delay (ideal)                                    0.0000     4.0000
+  u_alu/result_reg[7]/CK (sky130_fd_sc_hd__dfxtp_1)              0.0000     4.0000 r
+  clock uncertainty                                             -0.0500     3.9500
+  library setup time                                            -0.1500     3.8000
+  data required time                                                        3.8000
+  --------------------------------------------------------------------------------
+  data required time                                                        3.8000
+  data arrival time                                                        -4.4000
+  --------------------------------------------------------------------------------
+  slack (VIOLATED)                                                         -0.6000
+
+  Startpoint: u_div/quotient_reg[18]
+              (rising edge-triggered flip-flop clocked by clk)
+  Endpoint: u_regfile/regs_reg[27][9]
+            (rising edge-triggered flip-flop clocked by clk)
+  Path Group: clk
+  Path Type: max
+
+  Point                                                            Incr       Path 
+  --------------------------------------------------------------------------------
+  clock clk (rise edge)                                          0.0000     0.0000
+  clock network delay (ideal)                                    0.0000     0.0000
+  u_div/quotient_reg[18]/CK (sky130_fd_sc_hd__dfrtp_1)           0.0000     0.0000 r
+  u_div/quotient_reg[18]/Q (sky130_fd_sc_hd__dfrtp_1)            0.4000     0.4000 r
+  u_div/_n0820_/A (sky130_fd_sc_hd__mux2_1)                      0.3500     0.7500 r
+  u_div/_n0820_/X (sky130_fd_sc_hd__mux2_1)                      0.1500     0.9000 f
+  u_dpath/_n0433_/B (sky130_fd_sc_hd__nand2_1)                   0.4200     1.3200 r
+  u_dpath/_n0433_/Y (sky130_fd_sc_hd__nand2_1)                   0.1200     1.4400 f
+  u_xbar/_n0145_/A1 (sky130_fd_sc_hd__o21ai_0)                   0.5500     1.9900 r
+  u_xbar/_n0145_/Y (sky130_fd_sc_hd__o21ai_0)                    0.1400     2.1300 f
+  u_xbar/_n0162_/A (sky130_fd_sc_hd__and2_0)                     0.4800     2.6100 r
+  u_xbar/_n0162_/X (sky130_fd_sc_hd__and2_0)                     0.1300     2.7400 f
+  u_regfile/_n0233_/A (sky130_fd_sc_hd__mux2_1)                  0.5000     3.2400 r
+  u_regfile/_n0233_/X (sky130_fd_sc_hd__mux2_1)                  0.1200     3.3600 f
+  u_regfile/regs_reg[27][9]/D (sky130_fd_sc_hd__dfxtp_1)         0.7400     4.1000 f
+  data arrival time                                                         4.1000
+
+  clock clk (rise edge)                                          4.0000     4.0000
+  clock network delay (ideal)                                    0.0000     4.0000
+  u_regfile/regs_reg[27][9]/CK (sky130_fd_sc_hd__dfxtp_1)        0.0000     4.0000 r
+  clock uncertainty                                             -0.0500     3.9500
+  library setup time                                            -0.1500     3.8000
+  data required time                                                        3.8000
+  --------------------------------------------------------------------------------
+  data required time                                                        3.8000
+  data arrival time                                                        -4.1000
+  --------------------------------------------------------------------------------
+  slack (VIOLATED)                                                         -0.3000
+
+  Startpoint: imem_rdata[17]
+              (input port clocked by clk)
+  Endpoint: u_idex/op_reg[4]
+            (rising edge-triggered flip-flop clocked by clk)
+  Path Group: in2reg
+  Path Type: max
+
+  Point                                                            Incr       Path 
+  --------------------------------------------------------------------------------
+  clock clk (rise edge)                                          0.0000     0.0000
+  clock network delay (ideal)                                    0.0000     0.0000
+  input external delay                                           1.2000     1.2000 r
+  imem_rdata[17] (in)                                            0.0000     1.2000 r
+  u_ctrl/_n012_/A (sky130_fd_sc_hd__nand2_1)                     0.3000     1.5000 r
+  u_ctrl/_n012_/Y (sky130_fd_sc_hd__nand2_1)                     0.1600     1.6600 f
+  u_ctrl/_n031_/A1 (sky130_fd_sc_hd__o21ai_0)                    0.3000     1.9600 r
+  u_ctrl/_n031_/Y (sky130_fd_sc_hd__o21ai_0)                     0.1600     2.1200 f
+  u_dec/_n077_/A (sky130_fd_sc_hd__and2_0)                       0.3000     2.4200 r
+  u_dec/_n077_/X (sky130_fd_sc_hd__and2_0)                       0.1600     2.5800 f
+  u_dec/_n091_/A (sky130_fd_sc_hd__mux2_1)                       0.3000     2.8800 r
+  u_dec/_n091_/X (sky130_fd_sc_hd__mux2_1)                       0.1600     3.0400 f
+  u_dec/_n104_/A (sky130_fd_sc_hd__nand2_1)                      0.3000     3.3400 r
+  u_dec/_n104_/Y (sky130_fd_sc_hd__nand2_1)                      0.1600     3.5000 f
+  u_idex/op_reg[4]/D (sky130_fd_sc_hd__dfxtp_1)                  0.4500     3.9500 f
+  data arrival time                                                         3.9500
+
+  clock clk (rise edge)                                          4.0000     4.0000
+  clock network delay (ideal)                                    0.0000     4.0000
+  u_idex/op_reg[4]/CK (sky130_fd_sc_hd__dfxtp_1)                 0.0000     4.0000 r
+  clock uncertainty                                             -0.0500     3.9500
+  library setup time                                            -0.1500     3.8000
+  data required time                                                        3.8000
+  --------------------------------------------------------------------------------
+  data required time                                                        3.8000
+  data arrival time                                                        -3.9500
+  --------------------------------------------------------------------------------
+  slack (VIOLATED)                                                         -0.1500
+
+  Startpoint: u_idex/a_reg[12]
+              (rising edge-triggered flip-flop clocked by clk)
+  Endpoint: u_exmem/y_reg[12]
+            (rising edge-triggered flip-flop clocked by clk)
+  Path Group: clk
+  Path Type: max
+
+  Point                                                            Incr       Path 
+  --------------------------------------------------------------------------------
+  clock clk (rise edge)                                          0.0000     0.0000
+  clock network delay (ideal)                                    0.0000     0.0000
+  u_idex/a_reg[12]/CK (sky130_fd_sc_hd__dfrtp_1)                 0.0000     0.0000 r
+  u_idex/a_reg[12]/Q (sky130_fd_sc_hd__dfrtp_1)                  0.4000     0.4000 r
+  u_alu/_cm_0000/A1 (sky130_fd_sc_hd__o21a_1)                    0.1000     0.5000 r
+  u_alu/_cm_0000/X (sky130_fd_sc_hd__o21a_1)                     0.2400     0.7400 f
+  u_alu/_cm_0001/A1 (sky130_fd_sc_hd__o21a_1)                    0.1000     0.8400 r
+  u_alu/_cm_0001/X (sky130_fd_sc_hd__o21a_1)                     0.2400     1.0800 f
+  u_alu/_cm_0002/A1 (sky130_fd_sc_hd__o21a_1)                    0.1000     1.1800 r
+  u_alu/_cm_0002/X (sky130_fd_sc_hd__o21a_1)                     0.2400     1.4200 f
+  u_alu/_cm_0003/A1 (sky130_fd_sc_hd__o21a_1)                    0.1000     1.5200 r
+  u_alu/_cm_0003/X (sky130_fd_sc_hd__o21a_1)                     0.2400     1.7600 f
+  u_alu/_cm_0004/A1 (sky130_fd_sc_hd__o21a_1)                    0.1000     1.8600 r
+  u_alu/_cm_0004/X (sky130_fd_sc_hd__o21a_1)                     0.2400     2.1000 f
+  u_alu/_cm_0005/A1 (sky130_fd_sc_hd__o21a_1)                    0.1000     2.2000 r
+  u_alu/_cm_0005/X (sky130_fd_sc_hd__o21a_1)                     0.2400     2.4400 f
+  u_alu/_cm_0006/A1 (sky130_fd_sc_hd__o21a_1)                    0.1000     2.5400 r
+  u_alu/_cm_0006/X (sky130_fd_sc_hd__o21a_1)                     0.2400     2.7800 f
+  u_alu/_cm_0007/A1 (sky130_fd_sc_hd__o21a_1)                    0.1000     2.8800 r
+  u_alu/_cm_0007/X (sky130_fd_sc_hd__o21a_1)                     0.2400     3.1200 f
+  u_alu/_cm_0008/A1 (sky130_fd_sc_hd__o21a_1)                    0.1000     3.2200 r
+  u_alu/_cm_0008/X (sky130_fd_sc_hd__o21a_1)                     0.2400     3.4600 f
+  u_alu/_cm_0009/A1 (sky130_fd_sc_hd__o21a_1)                    0.1000     3.5600 r
+  u_alu/_cm_0009/X (sky130_fd_sc_hd__o21a_1)                     0.2400     3.8000 f
+  u_exmem/y_reg[12]/D (sky130_fd_sc_hd__dfxtp_1)                 0.1800     3.9800 f
+  data arrival time                                                         3.9800
+
+  clock clk (rise edge)                                          4.0000     4.0000
+  clock network delay (ideal)                                    0.0000     4.0000
+  u_exmem/y_reg[12]/CK (sky130_fd_sc_hd__dfxtp_1)                0.0000     4.0000 r
+  clock uncertainty                                             -0.0500     3.9500
+  library setup time                                            -0.1500     3.8000
+  data required time                                                        3.8000
+  --------------------------------------------------------------------------------
+  data required time                                                        3.8000
+  data arrival time                                                        -3.9800
+  --------------------------------------------------------------------------------
+  slack (VIOLATED)                                                         -0.1800
+
+  Startpoint: u_pc/pc_reg[5]
+              (rising edge-triggered flip-flop clocked by clk)
+  Endpoint: u_if/pc_reg[5]
+            (rising edge-triggered flip-flop clocked by clk)
+  Path Group: clk
+  Path Type: max
+
+  Point                                                            Incr       Path 
+  --------------------------------------------------------------------------------
+  clock clk (rise edge)                                          0.0000     0.0000
+  clock network delay (ideal)                                    0.0000     0.0000
+  u_pc/pc_reg[5]/CK (sky130_fd_sc_hd__dfrtp_1)                   0.0000     0.0000 r
+  u_pc/pc_reg[5]/Q (sky130_fd_sc_hd__dfrtp_1)                    0.4000     0.4000 r
+  u_pc/_pm_0000/A1 (sky130_fd_sc_hd__a21oi_1)                    0.1300     0.5300 r
+  u_pc/_pm_0000/Y (sky130_fd_sc_hd__a21oi_1)                     0.2800     0.8100 f
+  u_pc/_pm_0001/A1 (sky130_fd_sc_hd__a21oi_1)                    0.1300     0.9400 r
+  u_pc/_pm_0001/Y (sky130_fd_sc_hd__a21oi_1)                     0.2800     1.2200 f
+  u_pc/_pm_0002/A1 (sky130_fd_sc_hd__a21oi_1)                    0.1300     1.3500 r
+  u_pc/_pm_0002/Y (sky130_fd_sc_hd__a21oi_1)                     0.2800     1.6300 f
+  u_pc/_pm_0003/A1 (sky130_fd_sc_hd__a21oi_1)                    0.1300     1.7600 r
+  u_pc/_pm_0003/Y (sky130_fd_sc_hd__a21oi_1)                     0.2800     2.0400 f
+  u_pc/_pm_0004/A1 (sky130_fd_sc_hd__a21oi_1)                    0.1300     2.1700 r
+  u_pc/_pm_0004/Y (sky130_fd_sc_hd__a21oi_1)                     0.2800     2.4500 f
+  u_pc/_pm_0005/A1 (sky130_fd_sc_hd__a21oi_1)                    0.1300     2.5800 r
+  u_pc/_pm_0005/Y (sky130_fd_sc_hd__a21oi_1)                     0.2800     2.8600 f
+  u_pc/_pm_0006/A1 (sky130_fd_sc_hd__a21oi_1)                    0.1300     2.9900 r
+  u_pc/_pm_0006/Y (sky130_fd_sc_hd__a21oi_1)                     0.2800     3.2700 f
+  u_pc/_pm_0007/A1 (sky130_fd_sc_hd__a21oi_1)                    0.1300     3.4000 r
+  u_pc/_pm_0007/Y (sky130_fd_sc_hd__a21oi_1)                     0.2800     3.6800 f
+  u_if/pc_reg[5]/D (sky130_fd_sc_hd__dfxtp_1)                    0.1800     3.8600 f
+  data arrival time                                                         3.8600
+
+  clock clk (rise edge)                                          4.0000     4.0000
+  clock network delay (ideal)                                    0.0000     4.0000
+  u_if/pc_reg[5]/CK (sky130_fd_sc_hd__dfxtp_1)                   0.0000     4.0000 r
+  clock uncertainty                                             -0.0500     3.9500
+  library setup time                                            -0.1500     3.8000
+  data required time                                                        3.8000
+  --------------------------------------------------------------------------------
+  data required time                                                        3.8000
+  data arrival time                                                        -3.8600
+  --------------------------------------------------------------------------------
+  slack (VIOLATED)                                                         -0.0600
+
+  Startpoint: u_idex/rs1_reg[3]
+              (rising edge-triggered flip-flop clocked by clk)
+  Endpoint: u_exmem/fwd_reg[3]
+            (rising edge-triggered flip-flop clocked by clk)
+  Path Group: clk
+  Path Type: max
+
+  Point                                                            Incr       Path 
+  --------------------------------------------------------------------------------
+  clock clk (rise edge)                                          0.0000     0.0000
+  clock network delay (ideal)                                    0.0000     0.0000
+  u_idex/rs1_reg[3]/CK (sky130_fd_sc_hd__dfrtp_1)                0.0000     0.0000 r
+  u_idex/rs1_reg[3]/Q (sky130_fd_sc_hd__dfrtp_1)                 0.4000     0.4000 r
+  u_fwd/_fm_0000/A (sky130_fd_sc_hd__mux2_1)                     0.1000     0.5000 r
+  u_fwd/_fm_0000/X (sky130_fd_sc_hd__mux2_1)                     0.2000     0.7000 f
+  u_fwd/_fm_0001/A (sky130_fd_sc_hd__mux2_1)                     0.1000     0.8000 r
+  u_fwd/_fm_0001/X (sky130_fd_sc_hd__mux2_1)                     0.2000     1.0000 f
+  u_fwd/_fm_0002/A (sky130_fd_sc_hd__mux2_1)                     0.1000     1.1000 r
+  u_fwd/_fm_0002/X (sky130_fd_sc_hd__mux2_1)                     0.2000     1.3000 f
+  u_fwd/_fm_0003/A (sky130_fd_sc_hd__mux2_1)                     0.1000     1.4000 r
+  u_fwd/_fm_0003/X (sky130_fd_sc_hd__mux2_1)                     0.2000     1.6000 f
+  u_exmem/fwd_reg[3]/D (sky130_fd_sc_hd__dfxtp_1)                0.1500     1.7500 f
+  data arrival time                                                         1.7500
+
+  clock clk (rise edge)                                          4.0000     4.0000
+  clock network delay (ideal)                                    0.0000     4.0000
+  u_exmem/fwd_reg[3]/CK (sky130_fd_sc_hd__dfxtp_1)               0.0000     4.0000 r
+  clock uncertainty                                             -0.0500     3.9500
+  library setup time                                            -0.1500     3.8000
+  data required time                                                        3.8000
+  --------------------------------------------------------------------------------
+  data required time                                                        3.8000
+  data arrival time                                                        -1.7500
+  --------------------------------------------------------------------------------
+  slack (MET)                                                               2.0500
+

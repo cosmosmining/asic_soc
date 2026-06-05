@@ -51,7 +51,10 @@ tools/
   yosys/         synthesis scripts
   openroad/      P&R scripts
   scripts/       sim / build helpers
-gds_flow/        flow driver + reports
+  pd/            PD signoff automation: PrimeTime/OpenSTA report parser + flow scorecard (tested)
+  primetime/     multi-corner PrimeTime (pt_shell) signoff deck + SDC
+gds_flow/        flow driver + reports (OpenLane 1) ; openlane2/ (OpenLane 2 port)
+docs/            PD_PORTFOLIO.md — physical-design positioning & quantified results
 ```
 
 ## Conventions
@@ -66,6 +69,29 @@ gds_flow/        flow driver + reports
 # run the directed RV32I smoke test
 tools/scripts/run_sim.sh tb_riscv_core
 ```
+
+## Physical design (signoff + automation)
+
+This SoC goes RTL→GDSII on the real Sky130 PDK and closes timing; the PD work is
+quantified and automated, not hand-waved.
+
+```sh
+# one-screen PD scorecard from the real flow reports (area, util, WNS/TNS, fmax)
+python3 tools/pd/flow_metrics.py
+
+# classify PrimeTime/OpenSTA timing violations + suggest fix categories
+python3 tools/pd/pt_report_parser.py tools/pd/samples/setup_ss_corner.rpt --top 6
+
+# tests for both tools
+pytest tools/pd/tests -q
+```
+
+- **Result:** 20,789 cells, 0.201 mm², timing **MET** (WNS/TNS 0), worst setup
+  slack +6.52 ns ⇒ **74.2 MHz** achievable @ the 50 MHz target.
+- **Signoff decks:** `tools/primetime/` (PrimeTime multi-corner), OpenSTA, and
+  OpenLane 1 + 2 (`gds_flow/`).
+- **The full PD narrative** (incl. how DeepDGR global routing connects to the
+  net-dominated paths this toolkit flags): `docs/PD_PORTFOLIO.md`.
 
 ## Status / progress log
 
