@@ -240,7 +240,6 @@ module riscv_pipeline #(
     logic [1:0]      ex_wb_sel;
     logic            ex_reg_write, ex_alu_src_imm, ex_mem_read, ex_mem_write;
     logic            ex_branch, ex_jump, ex_jalr, ex_use_pc;
-    logic            ex_uses_rs1, ex_uses_rs2;
     logic            ex_pred_taken;
     logic [XLEN-1:0] ex_pred_target;
 
@@ -296,16 +295,14 @@ module riscv_pipeline #(
             ex_jump       <= c_jump;
             ex_jalr       <= c_jalr;
             ex_use_pc     <= c_use_pc;
-            ex_uses_rs1   <= c_uses_rs1;
-            ex_uses_rs2   <= c_uses_rs2;
         end
     end
 
     // ============================================================ EX stage
     // forwarding sources
-    logic [XLEN-1:0] em_alu_y, em_pc4, em_store_data, wb_fwd;
+    logic [XLEN-1:0] em_alu_y, em_pc4, em_store_data;
     logic [4:0]      em_rd;
-    logic            em_valid, em_reg_write, em_mem_read, em_mem_write;
+    logic            em_valid, em_reg_write, em_mem_write;
     logic [1:0]      em_wb_sel;
     logic [2:0]      em_funct3;
 
@@ -430,19 +427,16 @@ module riscv_pipeline #(
         if (!rst_n) begin
             em_valid     <= 1'b0;
             em_reg_write <= 1'b0;
-            em_mem_read  <= 1'b0;
             em_mem_write <= 1'b0;
             em_rd        <= 5'd0;
         end else if (div_stall) begin
             // insert a bubble into MEM while the divide is still computing
             em_valid     <= 1'b0;
             em_reg_write <= 1'b0;
-            em_mem_read  <= 1'b0;
             em_mem_write <= 1'b0;
         end else begin
             em_valid     <= ex_valid;
             em_reg_write <= ex_valid && ex_reg_write;
-            em_mem_read  <= ex_valid && ex_mem_read;
             em_mem_write <= ex_valid && ex_mem_write;
             em_alu_y     <= ex_result;          // divide result for DIV/REM
             em_pc4       <= ex_pc + 32'd4;
@@ -514,7 +508,6 @@ module riscv_pipeline #(
             wb_wdata     <= em_wb_data;
         end
     end
-    assign wb_fwd = wb_wdata;
 
     // ============================================================ WB / RVFI
     assign rvfi_valid = wb_valid;

@@ -69,7 +69,6 @@ module riscv_core #(
     // ------------------------------------------------------- control signals
     logic        reg_write;
     logic        alu_src_imm;   // ALU operand B = immediate
-    logic        mem_read;
     logic        mem_write;
     logic        branch;
     logic        jump;          // JAL/JALR (unconditional)
@@ -82,7 +81,6 @@ module riscv_core #(
         // defaults
         reg_write   = 1'b0;
         alu_src_imm = 1'b0;
-        mem_read    = 1'b0;
         mem_write   = 1'b0;
         branch      = 1'b0;
         jump        = 1'b0;
@@ -141,7 +139,6 @@ module riscv_core #(
             `OPC_LOAD: begin
                 reg_write   = 1'b1;
                 alu_src_imm = 1'b1;
-                mem_read    = 1'b1;
                 alu_op      = `ALU_ADD;   // address = rs1 + imm_i
                 alu_b_imm   = imm_i;
                 wb_sel      = 2'd1;       // from memory
@@ -200,12 +197,12 @@ module riscv_core #(
 
     // --------------------------------------------------------------- ALU
     logic [XLEN-1:0] alu_a, alu_b, alu_y;
-    logic            alu_zero;
+    logic            alu_zero_unused;
     // AUIPC needs PC as operand A; everything else uses rs1.
     assign alu_a = (opcode == `OPC_AUIPC) ? pc : rs1_data;
     assign alu_b = alu_src_imm ? alu_b_imm : rs2_data;
     alu #(.XLEN(XLEN)) u_alu (
-        .op(alu_op), .a(alu_a), .b(alu_b), .y(alu_y), .zero(alu_zero)
+        .op(alu_op), .a(alu_a), .b(alu_b), .y(alu_y), .zero(alu_zero_unused)
     );
 
     // ------------------------------------------------------- branch resolution
