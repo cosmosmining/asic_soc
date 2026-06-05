@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke:
+    name: smoke + differential regression (blocking)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Icarus Verilog + Python
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog python3
+          iverilog -V | head -1
+      - name: Directed smoke + 20-seed differential regression
+        run: make smoke
+
+  lint:
+    name: Verilator lint (advisory — Phase 0)
+    runs-on: ubuntu-24.04
+    continue-on-error: true   # core has known pre-existing warnings; blocking from Phase 1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Verilator
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y verilator
+          verilator --version
+      - name: Lint core RTL
+        run: make lint

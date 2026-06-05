@@ -3,6 +3,9 @@ build/
 *.vvp
 *.log
 build/*.hex
+obj_dir/
+__pycache__/
+*.pyc
 tools/.venv/
 tools/pdk/
 tools/OpenLane/
