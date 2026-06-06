@@ -41,5 +41,8 @@ dma: ## DMA + round-robin arbiter sim (1-ch + 2-ch concurrent copy)
 formal: ## formal proof of FIFO Gray-pointer invariants (yosys + smtbmc + z3)
 	bash formal/run_gray_proof.sh
 
+synth: ## generic Yosys synthesis + latch-free check per fabric block
+	bash syn/synth_check.sh
+
 clean:
 	rm -rf $(BUILD) obj_dir *.vcd

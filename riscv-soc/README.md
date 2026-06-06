@@ -21,8 +21,20 @@ timing/CDC note in [`../DESIGN_DECISIONS.md`](../DESIGN_DECISIONS.md).
 | AXI4-Lite SoC | xbar + ROM/SRAM/UART/timer integration | **PASS** — ROM read, SRAM r/w, ROM-write SLVERR, UART byte decoded off serial, timer count+IRQ | `CI` — iverilog |
 | DMA + arbiter | 2-channel DMA over the bus, round-robin arbiter | **PASS** — 1-ch copy + 2-ch concurrent copy verified | `CI` — iverilog |
 | all blocks | Verilator lint | **0 warnings** | `CI` — verilator 5.020 |
-| SoC | fmax / cell count / area (sky130) | — | ⬜ CI (after CPU integration) |
+| all blocks | Yosys synthesis | **latch-free, 0 inferred latches** | `CI` — yosys 0.33 (`make synth`) |
+| SoC | sky130 fmax / area | — | ⬜ PD track (OpenLane) |
 | SoC | dynamic power Δ (clock gating, DC) | — | ⏳ pending-CMU |
+
+### Generic synthesis (Yosys, technology-independent cell count)
+Fast reproducible synthesizability gate; sky130 area/fmax come from the PD track.
+| block | generic cells | latch-free |
+|-------|--------------:|:----------:|
+| async_fifo | 1136 | ✅ |
+| axil_arbiter | 152 | ✅ |
+| axil_xbar | 175 | ✅ |
+| dma_engine | 2376 | ✅ |
+| axil_uart | 112 | ✅ |
+| axil_timer | 597 | ✅ |
 
 Run it: `make -C .. soc` or, in this dir, `make all` (lint + sim + formal).
 
