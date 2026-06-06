@@ -35,6 +35,7 @@ Legend: ✅ built & reproduced · 🟡 in progress · ⬜ planned · ⏳ pending
 | Async FIFO (CDC showcase) | sim 256 words/2 clocks 0 err; **Gray invariants formally proven** | riscv-soc | `CI` — iverilog + yosys-smtbmc/z3 |
 | AXI4-Lite SoC fabric | xbar + ROM/SRAM/UART/timer integration **PASS**; lint-clean | riscv-soc | `CI` — iverilog + verilator |
 | 2-ch DMA + round-robin arbiter | concurrent dual-channel copy over the bus **PASS** | riscv-soc | `CI` — iverilog |
+| Arbiter formal safety | grant mutual-exclusion + stability **PROVEN**; **2 real RTL bugs** found+fixed | riscv-soc-dv | `CI` — yosys-smtbmc/z3 |
 | DC dynamic power Δ (clock gating) | — | riscv-soc | ⏳ `pending-CMU` |
 | UVM functional coverage ≥95% | — | riscv-soc-dv | ⏳ pending (DV track) |
 | ATPG stuck-at coverage ≥98% | — | riscv-soc-dft | ⏳ pending (DFT track) |

@@ -30,8 +30,8 @@ clean: ## remove build artifacts
 # --- per-track dispatch (implemented as each phase lands) ---
 soc: ## riscv-soc track (Phase 1)
 	$(MAKE) -C riscv-soc
-dv: ## riscv-soc-dv track (Phase 2)
-	@echo "riscv-soc-dv: Phase 2 — not yet implemented"
+dv: ## riscv-soc-dv track — formal proofs (yosys-smtbmc)
+	bash riscv-soc-dv/formal/run_arbiter_proof.sh
 dft: ## riscv-soc-dft track (Phase 2)
 	@echo "riscv-soc-dft: Phase 2 — not yet implemented"
 pd: ## riscv-soc-pd track (Phase 2)

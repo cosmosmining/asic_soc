@@ -115,5 +115,26 @@ module axil_arbiter #(
             assign mi_rresp  [i*2+:2]   = o_rresp;
         end
     endgenerate
+
+`ifdef FORMAL
+    // ---- safety properties (proved in riscv-soc-dv via yosys-smtbmc) ----
+    function automatic integer count_ones(input [M-1:0] v);
+        integer k; begin count_ones = 0;
+            for (k = 0; k < M; k = k + 1) count_ones = count_ones + v[k];
+        end
+    endfunction
+    // at most one master is selected on each response channel (no bus contention)
+    always @(*) assert (count_ones(mi_awready) <= 1);
+    always @(*) assert (count_ones(mi_arready) <= 1);
+    always @(*) assert (count_ones(mi_bvalid)  <= 1);
+    always @(*) assert (count_ones(mi_rvalid)  <= 1);
+    // registered-grant property: the grant never changes mid-transaction (the
+    // anti-glitch invariant that fixed the double-issue bug, see DESIGN_DECISIONS)
+    reg fv = 1'b0; always @(posedge clk) fv <= 1'b1;
+    always @(posedge clk) if (fv && rst_n && $past(rst_n) && $past(wlock))
+        assert (wgrant == $past(wgrant));
+    always @(posedge clk) if (fv && rst_n && $past(rst_n) && $past(rlock))
+        assert (rgrant == $past(rgrant));
+`endif
 endmodule
 `default_nettype wire

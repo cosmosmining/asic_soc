@@ -24,6 +24,11 @@ full SystemVerilog UVM coverage on VCS+Verdi.
 ## Results
 | Metric | Value | Provenance |
 |--------|-------|-----------|
-| Functional coverage | — | ⏳ pending |
-| Bugs found (real) | — | ⬜ `BUGS_FOUND.md` |
-| Formal proofs (FIFO/arbiter) | — | ⬜ CI (SymbiYosys) |
+| Formal: arbiter grant mutual-exclusion + stability | **PROVEN** (BMC base + induction) | `CI` — yosys-smtbmc + z3 (`make dv`) |
+| Formal: FIFO Gray-pointer invariants | **PROVEN** | `CI` — yosys-smtbmc + z3 (riscv-soc) |
+| Real RTL bugs found + fixed | **2** (1 high, closed with a formal proof) | [`BUGS_FOUND.md`](BUGS_FOUND.md) |
+| DMA copy + 2-ch concurrency | **PASS** | `CI` — `tb_dma` (riscv-soc) |
+| Functional coverage (UVM ≥95%) | — | ⏳ pending-CMU |
+| riscv-dv + Spike co-sim | — | ⬜ planned (open-source) |
+
+See [`VERIFICATION_PLAN.md`](VERIFICATION_PLAN.md) for the full plan + tiering.
