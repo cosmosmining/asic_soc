@@ -64,11 +64,28 @@ only briefly under-utilize. That's the safe direction.
 `set_false_path` (or a max-delay bounded by one destination period) on the synchronizer
 data inputs, so STA doesn't time the asynchronous launch→capture edge.
 
-**Gaps to study (riscv-soc):** exact MTBF formula and how to back out settling time; AXI4-Lite
-vs full AXI4 (no bursts/IDs) handshake corner cases; gshare aliasing vs the BTB+BHT I have;
-clock-gating insertion + how DC reports the dynamic-power delta.
+**Q. Your AXI4-Lite slave asserts READY the cycle after AW/W and BVALID the cycle after that — why not same-cycle?**
+A same-cycle READY+BVALID slave is legal, but my 1×N router latches the routed slave on the
+AW handshake and releases on B. If READY and B land in the same cycle, the lock can't engage
+before it would need to release → it sticks busy and deadlocks the next transaction. The
+1-cycle AW→B separation makes the lock clean. I actually hit this deadlock in sim and fixed
+it by decoupling the handshake — good "I debug protocol timing" story.
 
-_Expanding as AXI fabric / arbiter / DMA land._
+**Q. How does the router avoid mis-routing a response when the master moves to the next address?**
+Per-direction lock: on AW-accept it latches the decoded slave index and holds the route until
+B completes (single outstanding write; same for read/R). A later AR/AW to a different slave is
+held off (its READY is gated) until the in-flight transaction's response returns.
+
+**Q. Why is AXI4-Lite enough here instead of full AXI4?**
+The peripheral bus moves single 32-bit words — no bursts, no out-of-order, no multiple IDs.
+AXI4-Lite is the exact subset for that, so it's spec-complete with a fraction of the
+verification surface. Bursty masters (a cache refill) would want full AXI4.
+
+**Gaps to study (riscv-soc):** exact MTBF formula and how to back out settling time; gshare
+aliasing vs the BTB+BHT I have; clock-gating insertion + how DC reports the dynamic-power
+delta; wiring the CPU's load/store path onto AXI with proper stall/ready (the next increment).
+
+_Expanding as arbiter / DMA / CPU-on-bus land._
 
 ## riscv-soc-dv (DV track)
 _Seeded in Phase 2. Expect: UVM phasing, RAL frontdoor/backdoor, scoreboard vs predictor,

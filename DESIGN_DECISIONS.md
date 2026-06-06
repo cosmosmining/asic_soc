@@ -90,6 +90,24 @@ crossbar); gshare vs the existing BTB+BHT predictor for the stretch item._
   `formal/run_gray_proof.sh` / `gray_inc.sby`). Multiclock FIFO-level ordering/depth proofs
   are the dv-track extension.
 
+### D-SOC.2 AXI4-Lite bus topology
+- **Options:** (A) shared-bus + address decoder, single outstanding; (B) full NxM
+  crossbar with per-slave queues; (C) pipelined/AXI4 with bursts + IDs.
+- **Choice:** A — a 1xN decoder/router (`axil_xbar`) with a per-direction lock
+  (one outstanding read + one outstanding write).
+- **Why:** AXI4-Lite has no bursts/IDs, so a single-outstanding router is spec-complete and
+  far easier to verify and synthesize; the multi-master story is handled by a round-robin
+  arbiter *in front of* the router (next increment) rather than a full crossbar. B/C are
+  overkill for this peripheral bus and add verification surface for no interview value here.
+- **Slave handshake note:** all slaves use the canonical decoupled handshake — AW+W accepted
+  with a 1-cycle READY pulse, **B asserted the following cycle**. That 1-cycle AW→B
+  separation is what lets the router's lock latch the routed slave on address-accept and
+  release on the response, so a back-to-back transaction to a different slave can't mis-route
+  an in-flight B/R. (A same-cycle READY+B slave deadlocks the lock — found and fixed in sim.)
+- **Peripherals:** `axil_sram` (RAM or READONLY ROM w/ `$readmemh` init, byte strobes,
+  SLVERR on ROM write); `axil_uart` (8N1 TX serializer, status reg); `axil_timer`
+  (free-running MTIME + MTIMECMP compare IRQ). All Verilator-lint-clean.
+
 ## riscv-soc-dv (DV track) — decisions
 _Phase 2. Process gate: you write the verification plan first; I interview on the DUT and
 critique the plan before any code._
