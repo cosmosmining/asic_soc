@@ -427,7 +427,8 @@ module riscv_pipeline #(
     assign div_stall = div_stall_w || mul_stall_w;
 
     // EX result feeding EX/MEM: CSR read, else multiply/divide result, else ALU
-    // (csr_rdata declared in the CSR block below).
+    // (csr_rdata is driven by the CSR block below; declared here for ordering).
+    logic [XLEN-1:0] csr_rdata;
     wire [XLEN-1:0] ex_result = ex_is_csr ? csr_rdata :
                                 mul_op    ? mul_result :
                                 div_op    ? div_result : alu_y;
@@ -465,7 +466,7 @@ module riscv_pipeline #(
     wire [XLEN-1:0] pred_nextpc   = ex_pred_taken   ? ex_pred_target : (ex_pc + 32'd4);
 
     // ------------------------------ CSR access + trap resolution (EX) --------
-    logic [XLEN-1:0] csr_rdata, csr_trap_target, csr_mret_target;
+    logic [XLEN-1:0] csr_trap_target, csr_mret_target;   // csr_rdata declared above
     logic            csr_illegal;
     logic [XLEN-1:0] csr_wsrc;
     assign csr_wsrc = ex_csr_is_imm ? {27'b0, ex_rs1} : fwd_a;   // *I uses zimm
