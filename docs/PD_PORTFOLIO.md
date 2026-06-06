@@ -77,13 +77,15 @@ an **OpenLane 2** port ships in `gds_flow/openlane2/`.
 | Sequential area | 36.6 % | measured |
 | Floorplan target util | 16 % (routing-bound — see below) | config |
 | Clock target | 20 ns / 50 MHz | config |
-| WNS / TNS | **0.000 / 0.000 ns** | measured |
-| Worst setup / hold slack | **+6.52 / +0.06 ns** | measured |
-| Timing | **MET** | measured |
-| **Achieved fmax** | **74.2 MHz** (1 / (T − WNS)) | derived |
+| Setup WNS / TNS | **0.000 / 0.000 ns** | measured |
+| Worst setup / hold slack | **+6.40 / −0.14 ns** | measured |
+| Timing | setup clean; **−0.14 ns post-route hold** open | measured |
+| **Achieved fmax** (setup-limited) | **73.5 MHz** (1 / (T − WNS)) | derived |
 
-> Closed at the 50 MHz target with +6.52 ns setup headroom ⇒ **74.2 MHz
-> achievable** — a quantified, honest fmax, not a synthesis estimate.
+> Setup closes at the 50 MHz target with +6.40 ns headroom ⇒ **73.5 MHz
+> achievable**. A small −0.14 ns post-route hold violation remains (the timing
+> resizer was disabled in the Iteration-8 dev-image run) — the kind of thing the
+> parser flags as hold-buffer insertion, a P&R hold-fix step, not an fmax limit.
 
 **A real PD lesson, stated plainly:** the multiplier/divider cones make this core
 **routing-bound** — utilization had to stay low (16%) with
@@ -148,7 +150,7 @@ report — the parser is tool-agnostic.
 | **lever** | global routing quality | full backend execution | signoff turnaround |
 | **lead metric** | overflow / WL / runtime ↓ | fmax + DRC/LVS clean | violations triaged → fixes |
 | **for NVIDIA** | improves *their* DGR | shows you run their stack | speaks their Tcl |
-| **status** | research result *(numbers: yours)* | sky130 GDS, **MET @ 74.2 MHz** | runnable, **32 tests pass** |
+| **status** | research result *(numbers: yours)* | sky130 GDS, setup-clean **@ 73.5 MHz** | runnable, **32 tests pass** |
 
 ## 5. Honest status
 

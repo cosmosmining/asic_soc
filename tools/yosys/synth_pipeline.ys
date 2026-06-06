@@ -2,8 +2,10 @@
 # Usage: yosys -s tools/yosys/synth_pipeline.ys
 read_verilog -sv -I rtl/common \
     rtl/cpu_riscv/regfile.sv \
+    rtl/cpu_riscv/csr.sv \
     rtl/cpu_riscv/alu.sv \
     rtl/cpu_riscv/divider.sv \
+    rtl/cpu_riscv/mul_seq.sv \
     rtl/cpu_riscv/riscv_pipeline.sv
 
 hierarchy -check -top riscv_pipeline

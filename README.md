@@ -86,8 +86,9 @@ python3 tools/pd/pt_report_parser.py tools/pd/samples/setup_ss_corner.rpt --top 
 pytest tools/pd/tests -q
 ```
 
-- **Result:** 20,789 cells, 0.201 mm², timing **MET** (WNS/TNS 0), worst setup
-  slack +6.52 ns ⇒ **74.2 MHz** achievable @ the 50 MHz target.
+- **Result:** 20,789 cells, 0.201 mm²; setup closes with **+6.40 ns** slack ⇒
+  **73.5 MHz** achievable @ the 50 MHz target. A small −0.14 ns post-route hold
+  violation remains (Iteration 8) — the parser flags it as hold-buffer insertion.
 - **Signoff decks:** `tools/primetime/` (PrimeTime multi-corner), OpenSTA, and
   OpenLane 1 + 2 (`gds_flow/`).
 - **The full PD narrative** (incl. how DeepDGR global routing connects to the

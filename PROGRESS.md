@@ -226,27 +226,27 @@ mtvec/mepc/mcause, ECALL/EBREAK/MRET), extending the golden model + UVM referenc
 
 ---
 
-## Iteration 8 — real routed GDSII via OpenLane (Sky130)
+## Iteration 8 — real RTL→GDSII (sky130, OpenLane on local Docker)
 
-**Goal (user priority, "is it ready to fab?"):** push past std-cell synthesis to
-an actual place-and-routed GDSII with signoff numbers.
+**Goal (user ask):** actually run the physical flow to a GDS, locally.
 
-**Changed / done**
-- Ran the full OpenLane (OpenROAD) flow on a Docker/Colima host:
-  floorplan → PG → placement → CTS → global+detailed route → fill → DRC/LVS →
-  OpenSTA. Tracked the working config (`gds_flow/openlane_config.json`) and the
-  signoff reports (`gds_flow/reports/`).
-- Congestion lesson baked into the config: the mul/div cones make the core
-  **routing-bound**, so `FP_CORE_UTIL` had to drop to 16% with
-  `GRT_ALLOW_CONGESTION` to route clean (post-route timing resizer skipped).
+**Done**
+- Stood up headless Docker (**Colima** arm64 VM + Rosetta for the x86 OpenLane
+  image) — no Docker Desktop / GUI needed. Pulled OpenLane, installed sky130 PDK.
+- Ran OpenLane: synthesis → floorplan → placement → CTS → **detailed routing
+  (0 DRC violations)** → SPEF extraction → **GDSII** (streamed via Magic from the
+  clean routed DEF). Worked around 3 bugs in the `latest` dev image (unset
+  `GLB_RESIZER_TIMING_OPTIMIZATIONS`, unset `$::env(PWD)`, and a `/dev/null` RCX
+  save), plus relieved routing congestion (util 35→16%).
 
-**Result (real routed run):** **timing MET** — WNS 0.00, TNS 0.00, worst setup
-slack **+6.52 ns**, worst hold slack **+0.06 ns** at the 20 ns / 50 MHz target.
-Std-cell area **0.201 mm² / 20,789 cells**.
+**Result:** real **`gds_flow/gds/riscv_pipeline.gds.gz`** (112 MB → 20 MB),
+die **2.03 mm²**, router DRC **0 violations**, post-CTS timing **MET @50 MHz**
+(+6.52 ns slack). See `gds_flow/RESULTS.md`.
 
-**Honest status:** a genuinely routed GDS with positive-slack signoff on the open
-PDK. Not a tapeout (no shuttle/pads/full corner sweep), but the backend ran end
-to end and closed.
+**Honest caveats:** post-*route* timing not closed at 20 ns (the crashing timing
+resizer was disabled), and LVS not reached (dev-image bug). A stable OpenLane
+image would finish post-route opt + LVS. So: a real DRC-clean routed GDSII exists;
+it is **not** a fully signed-off tapeout.
 
 ---
 
@@ -254,7 +254,7 @@ to end and closed.
 
 **Goal (user priority, "PD teams live in Tcl/Python — show it"):** build the
 day-job automation that turns signoff text into decisions, and frame the whole
-PD story (DeepDGR routing + this flow + the tooling) coherently.
+PD story (DeepDGR routing + the Iteration-8 flow + the tooling) coherently.
 
 **Changed**
 - `tools/pd/pt_report_parser.py` — parses PrimeTime/OpenSTA `report_timing`
@@ -263,41 +263,45 @@ PD story (DeepDGR routing + this flow + the tooling) coherently.
   **fix category** (restructure/retime, net/placement-routing, upsize+VT, useful
   skew, I/O budget, hold-buffer, CDC/constraint), and emits a prioritized Pareto
   as text/JSON/CSV with a `--fail-on-violation` CI gate.
-- `tools/pd/flow_metrics.py` — scrapes the real `gds_flow/` reports into a
-  one-screen scorecard (cells, area, util target, WNS/TNS, **achieved fmax =
-  1/(T−WNS) = 74.2 MHz**), labeling measured vs. derived.
+- `tools/pd/flow_metrics.py` — scrapes the Iteration-8 `gds_flow/` reports into a
+  one-screen scorecard (cells, area, util target, WNS/TNS, and **achieved fmax =
+  1/(T−WNS)** from the worst setup slack), labeling measured vs. derived. On the
+  current reports: 20,789 cells / 0.201 mm², setup **+6.40 ns ⇒ 73.5 MHz**, with
+  the small **−0.14 ns post-route hold** violation Iteration 8 flagged still open
+  (the parser classifies it as hold-buffer insertion — the right P&R fix).
 - `tools/pd/samples/` + `_gen_samples.py` — representative, arithmetically
-  self-consistent `report_timing` fixtures covering every fix category; one
-  mirrors the real +6.52 ns clean signoff.
+  self-consistent `report_timing` fixtures covering every fix category.
 - `tools/pd/tests/` — **32 pytest cases** (parsing, features, classification,
-  aggregation, JSON/CSV, CLI) — all pass locally.
+  aggregation, JSON/CSV, CLI) — all pass; the flow-metrics test reads the live
+  signoff reports value-agnostically so it survives flow re-runs.
 - `tools/primetime/` — real `pt_shell` multi-corner signoff deck (`mmmc.tcl`,
   `constraints.sdc`, `report_signoff.tcl`, `run_pt.tcl`): setup@slow / hold@fast
   / typical-reference with OCV derate, emitting the exact format the parser eats.
 - `gds_flow/openlane2/` — OpenLane 2 (LibreLane) port of the validated OL1 config.
 - `docs/PD_PORTFOLIO.md` — frames **DeepDGR with routing metrics** (overflow,
-  wirelength, runtime — not ML accuracy) and draws the bridge: better global
-  routing → net-dominated paths gain slack → the parser flags exactly those as a
-  "routing-quality lever (DeepDGR)". README updated with a PD quick-start.
+  wirelength, runtime — not ML accuracy) and bridges router quality → the
+  net-dominated paths the parser flags. README updated with a PD quick-start.
 
-**Verify** — `pytest tools/pd/tests -q`: **32 passed**. The parser reproduces the
-real signoff (worst setup +6.52 ns ⇒ 74.2 MHz @ 20 ns) and classifies all five
+**Also (flow hygiene):** `tools/yosys/synth_{pipeline,riscv}.ys` now `mkdir -p
+build` before `write_verilog`, fixing the `synth-check` CI job on fresh checkouts
+(build/ is gitignored, so a synth-only runner had no output dir). Verified
+end-to-end with yosys 0.33.
+
+**Verify** — `pytest tools/pd/tests -q`: **32 passed**. Parser classifies all five
 setup fix categories + hold + CDC correctly on the sample corners.
 
 **Honest status:** the Python toolkit runs and is unit-tested here; the PrimeTime
-deck and OL2 config are complete, idiomatic, and ready to run but need commercial
-PrimeTime / a Docker host (not in this CI) — the parser that consumes their
-output *is* tested against representative captures of that exact format.
-
-**Next single-step action** — wire the OL2 `metrics.json` into `flow_metrics`
-for achieved (not just target) utilization, and add `report_clock_skew` parsing
-so the parser can separate useful-skew opportunities from real skew problems.
+deck and OL2 config are complete and idiomatic but need commercial PrimeTime / a
+Docker host (not in this CI) — the parser that consumes their output *is* tested
+against representative captures of that exact format.
 
 ---
 
 ## Backlog (ordered)
 0. ~~Branch prediction (BTB + 2-bit BHT)~~ ✅ (Iteration 4)
 00. ~~Physical synth (sky130 area) + UVM env + multi-cycle divider~~ ✅ (Iter 5-7)
+000. ~~Real RTL→GDSII on local Docker (sky130/OpenLane)~~ ✅ (Iter 8)
+0000. ~~PD signoff automation (PrimeTime parser + flow scorecard) + multi-corner deck~~ ✅ (Iter 9)
 1. ~~Golden-trace co-sim harness~~ ✅ (Iteration 2)
 2. ~~5-stage pipeline: forwarding, load-use stall, branch flush~~ ✅ (Iteration 2)
 3. ~~DIV/REM (M-extension)~~ ✅ (Iteration 3) — now combinational; multi-cycle later.
@@ -306,6 +310,4 @@ so the parser can separate useful-skew opportunities from real skew problems.
 5. AXI-lite memory slave + interconnect; swap TB BRAM for it via adapter.
 6. GPU SIMD lanes (vec add/mul/dot) sharing the AXI fabric.
 7. ARM-like educational core.
-8. ~~OpenROAD P&R run from the Yosys netlist → GDS, timing/area reports~~ ✅ (Iteration 8)
-9. ~~PD signoff automation (PrimeTime parser + flow scorecard) + multi-corner deck~~ ✅ (Iteration 9)
-10. Wire OL2 metrics.json → flow_metrics (achieved util); clock-skew report parsing.
+8. OpenROAD P&R run from the Yosys netlist → GDS, timing/area reports.
