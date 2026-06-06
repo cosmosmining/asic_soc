@@ -81,11 +81,28 @@ The peripheral bus moves single 32-bit words — no bursts, no out-of-order, no 
 AXI4-Lite is the exact subset for that, so it's spec-complete with a fraction of the
 verification surface. Bursty masters (a cache refill) would want full AXI4.
 
+**Q. Tell me about a bug you found in your arbiter.**
+My round-robin arbiter first drove the grant *combinationally* from the request vector. Under
+two-master contention, when the other master's `AWVALID` toggled mid-handshake the selected
+index flipped, the slave saw a second `AWVALID`, and one address got **double-issued** — in sim
+a DMA channel's `LEN` write committed twice and its `START` write was dropped, so that channel
+silently never ran. I root-caused it from a config-write trace, then fixed it by **registering
+the grant**: latch the round-robin winner when the channel is idle and hold it from lock until
+the response handshake. One cycle of arbitration latency, zero glitching. Good lesson that
+"works with one master" hides multi-master hazards.
+
+**Q. Your DMA is a bus master and a bus slave — why, and how do you keep them straight?**
+Slave port = the CPU programs SRC/DST/LEN/CTRL registers (per channel); master port = the
+engine issues the actual read/write transactions to move data. They're separate AXI ports on
+separate fabric attach points (config is xbar slave 4; the master goes through the arbiter).
+The config-slave write path latches AW and W independently so it's robust to AW/W skew the
+arbiter can introduce.
+
 **Gaps to study (riscv-soc):** exact MTBF formula and how to back out settling time; gshare
 aliasing vs the BTB+BHT I have; clock-gating insertion + how DC reports the dynamic-power
 delta; wiring the CPU's load/store path onto AXI with proper stall/ready (the next increment).
 
-_Expanding as arbiter / DMA / CPU-on-bus land._
+_Expanding as CPU-on-bus lands._
 
 ## riscv-soc-dv (DV track)
 _Seeded in Phase 2. Expect: UVM phasing, RAL frontdoor/backdoor, scoreboard vs predictor,

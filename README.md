@@ -34,6 +34,7 @@ Legend: ✅ built & reproduced · 🟡 in progress · ⬜ planned · ⏳ pending
 | Verilator lint (core) | 51 warnings, 0 errors — **not yet clean** | core | `CI` — baseline; lint-clean is a Phase-1 task |
 | Async FIFO (CDC showcase) | sim 256 words/2 clocks 0 err; **Gray invariants formally proven** | riscv-soc | `CI` — iverilog + yosys-smtbmc/z3 |
 | AXI4-Lite SoC fabric | xbar + ROM/SRAM/UART/timer integration **PASS**; lint-clean | riscv-soc | `CI` — iverilog + verilator |
+| 2-ch DMA + round-robin arbiter | concurrent dual-channel copy over the bus **PASS** | riscv-soc | `CI` — iverilog |
 | DC dynamic power Δ (clock gating) | — | riscv-soc | ⏳ `pending-CMU` |
 | UVM functional coverage ≥95% | — | riscv-soc-dv | ⏳ pending (DV track) |
 | ATPG stuck-at coverage ≥98% | — | riscv-soc-dft | ⏳ pending (DFT track) |

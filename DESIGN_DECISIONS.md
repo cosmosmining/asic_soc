@@ -108,6 +108,27 @@ crossbar); gshare vs the existing BTB+BHT predictor for the stretch item._
   SLVERR on ROM write); `axil_uart` (8N1 TX serializer, status reg); `axil_timer`
   (free-running MTIME + MTIMECMP compare IRQ). All Verilator-lint-clean.
 
+### D-SOC.3 Multi-master arbitration + DMA
+- **Topology:** masters {CPU/external, DMA} → `axil_arbiter` (round-robin, M=2) → `axil_xbar`
+  (N=5: adds DMA-config as a slave) → peripherals. The DMA (`dma_engine`) is both a bus
+  **slave** (its SRC/DST/LEN/CTRL registers per channel) and a bus **master** (the data
+  mover); its two channels round-robin per word so concurrent copies make fair progress.
+- **Arbiter decision — registered vs combinational grant:** first cut drove the grant
+  combinationally from the request vector (`rr_pick(awvalid)`). Under contention this
+  **glitched**: when the second master's `AWVALID` toggled mid-handshake, the selected
+  master flipped, the slave saw a second `AWVALID`, and an address was **double-issued**
+  (caught in sim: a channel's `LEN` write committed twice and its `START` write was lost,
+  so that DMA channel never ran). Fix: **register the grant** — latch the round-robin winner
+  when idle and hold it from lock to response handshake, so routing is stable for the whole
+  transaction (1-cycle arbitration latency, no glitch).
+- **Slave write robustness:** the DMA config slave latches `AW` and `W` **independently** and
+  commits when both are captured, rather than assuming they arrive the same cycle — robust to
+  AW/W skew an arbiter can introduce. (The simple peripherals are only ever driven by a single
+  master per transaction, so they keep the simpler same-cycle accept.)
+- **Timing note:** single-clock domain throughout the fabric; no CDC here (the async FIFO is
+  the dedicated CDC block). Critical path is the address-decode + response mux; pipeldining the
+  decode is the move if fmax needs it.
+
 ## riscv-soc-dv (DV track) — decisions
 _Phase 2. Process gate: you write the verification plan first; I interview on the DUT and
 critique the plan before any code._
