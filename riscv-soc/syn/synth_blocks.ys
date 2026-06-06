@@ -1,0 +1,1 @@
+read_verilog -sv rtl/sync_2ff.sv rtl/async_fifo.sv rtl/axil_uart.sv rtl/axil_timer.sv rtl/axil_xbar.sv rtl/axil_arbiter.sv rtl/dma_engine.sv

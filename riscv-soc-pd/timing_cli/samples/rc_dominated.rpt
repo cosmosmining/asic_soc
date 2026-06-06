@@ -1,0 +1,25 @@
+Startpoint: u_dma/ch0_reg (rising edge-triggered flip-flop clocked by clk)
+Endpoint: u_mem/wr_reg (rising edge-triggered flip-flop clocked by clk)
+Path Group: clk
+Path Type: max
+
+  Delay    Time   Description
+  ------------------------------------------------------------
+   0.00    0.00   clock clk (rise edge)
+   0.10    0.10   clock network delay (propagated)
+   0.00    0.10 ^ u_dma/ch0_reg/CLK (sky130_fd_sc_hd__dfxtp_1)
+   0.30    0.40 v u_dma/ch0_reg/Q (sky130_fd_sc_hd__dfxtp_1)
+   0.10    0.50 ^ u_dma/buf1/X (sky130_fd_sc_hd__buf_2)
+   0.40    0.90   net long_route_a (fanout 8)
+   0.10    1.00 ^ u_dma/buf2/X (sky130_fd_sc_hd__buf_2)
+   0.50    1.50   net long_route_b (fanout 12)
+   0.10    1.60 ^ u_mem/buf3/X (sky130_fd_sc_hd__buf_2)
+   0.45    2.05   net long_route_c (fanout 6)
+   0.00    2.05   data arrival time
+
+   8.00    8.00   clock clk (rise edge)
+   0.11    8.11   clock network delay (propagated)
+  -0.20    7.91   library setup time
+           7.91   data required time
+  ------------------------------------------------------------
+          -0.60   slack (VIOLATED)

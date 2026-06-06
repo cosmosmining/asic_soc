@@ -1,0 +1,33 @@
+Startpoint: u_alu/acc_reg (rising edge-triggered flip-flop clocked by clk)
+Endpoint: u_alu/res_reg (rising edge-triggered flip-flop clocked by clk)
+Path Group: clk
+Path Type: max
+
+  Delay    Time   Description
+  ------------------------------------------------------------
+   0.00    0.00   clock clk (rise edge)
+   0.10    0.10   clock network delay (propagated)
+   0.00    0.10 ^ u_alu/acc_reg/CLK (sky130_fd_sc_hd__dfxtp_1)
+   0.30    0.40 v u_alu/acc_reg/Q (sky130_fd_sc_hd__dfxtp_1)
+   0.10    0.50 ^ u_alu/g01/X (sky130_fd_sc_hd__nand2_1)
+   0.10    0.60 ^ u_alu/g02/X (sky130_fd_sc_hd__nand2_1)
+   0.10    0.70 ^ u_alu/g03/X (sky130_fd_sc_hd__nand2_1)
+   0.10    0.80 ^ u_alu/g04/X (sky130_fd_sc_hd__nand2_1)
+   0.10    0.90 ^ u_alu/g05/X (sky130_fd_sc_hd__nand2_1)
+   0.01    0.91   net n5 (fanout 2)
+   0.10    1.01 ^ u_alu/g06/X (sky130_fd_sc_hd__nand2_1)
+   0.10    1.11 ^ u_alu/g07/X (sky130_fd_sc_hd__nand2_1)
+   0.10    1.21 ^ u_alu/g08/X (sky130_fd_sc_hd__nand2_1)
+   0.10    1.31 ^ u_alu/g09/X (sky130_fd_sc_hd__nand2_1)
+   0.10    1.41 ^ u_alu/g10/X (sky130_fd_sc_hd__nand2_1)
+   0.10    1.51 ^ u_alu/g11/X (sky130_fd_sc_hd__nand2_1)
+   0.10    1.61 ^ u_alu/g12/X (sky130_fd_sc_hd__nand2_1)
+   0.01    1.62   net n12 (fanout 1)
+   0.00    1.62   data arrival time
+
+   8.00    8.00   clock clk (rise edge)
+   0.12    8.12   clock network delay (propagated)
+  -0.20    7.92   library setup time
+           7.92   data required time
+  ------------------------------------------------------------
+          -0.45   slack (VIOLATED)

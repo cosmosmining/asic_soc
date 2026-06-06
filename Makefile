@@ -1,41 +1,38 @@
 # asic_soc - top-level build / verify / lint entry point.
 #
-# Quick start:
-#   make tools     # one-time: install iverilog + verilator (Debian/Ubuntu)
-#   make lint      # static lint (Verilator -Wall, zero warnings tolerated)
-#   make sim       # single-cycle directed golden-trace test
-#   make regress   # full differential regression (both cores + random seeds)
-#   make           # == lint + regress  (the gate CI runs)
+# Combined tree:
+#   * verified RV32IM core (CSR + sequential multiplier + caches + sky130 GDS signoff)
+#   * four-track interview portfolio: riscv-soc / -dv / -dft / -pd
 #
-# Synthesis (needs yosys; sky130 flow needs the PDK via volare -- see gds_flow/):
-#   make synth         # generic yosys elaboration/area for the pipeline
-#   make synth-sky130  # map onto the real sky130 standard-cell library
+# Quick start:
+#   make tools      # one-time: install iverilog + verilator
+#   make lint       # Verilator lint: core (with waivers) + portfolio blocks, 0 warnings
+#   make regress    # differential regression (both cores + random seeds)
+#   make portfolio  # run all four portfolio tracks (soc/dv/dft/pd)
+#   make            # help
 
 SHELL    := /bin/bash
 ROOT     := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 BUILD    := $(ROOT)/build
+.DEFAULT_GOAL := help
 
-# --- source lists ----------------------------------------------------------
+# --- core source lists -----------------------------------------------------
 COMMON   := rtl/common
 RTL_CORE := rtl/cpu_riscv/regfile.sv rtl/cpu_riscv/csr.sv rtl/cpu_riscv/alu.sv \
             rtl/cpu_riscv/riscv_core.sv
 RTL_PIPE := rtl/cpu_riscv/regfile.sv rtl/cpu_riscv/csr.sv rtl/cpu_riscv/alu.sv \
             rtl/cpu_riscv/divider.sv rtl/cpu_riscv/mul_seq.sv rtl/cpu_riscv/riscv_pipeline.sv
 
-# --- tools -----------------------------------------------------------------
-IVERILOG := iverilog
-VERILATOR:= verilator
-WAIVERS  := tools/verilator/lint_waivers.vlt
-VFLAGS   := --lint-only -Wall -I$(COMMON) $(WAIVERS)
-
-# Random regression knobs (override on the command line: make regress SEEDS=200)
+VERILATOR := verilator
+WAIVERS   := tools/verilator/lint_waivers.vlt
+VFLAGS    := --lint-only -Wall -I$(COMMON) $(WAIVERS)
 SEEDS    ?= 50
 INSTR    ?= 64
 
-.PHONY: all tools sim sim-pipeline regress lint lint-core lint-pipe \
-        synth synth-sky130 clean help
+.PHONY: all help tools sim sim-pipeline regress lint lint-core lint-pipe \
+        synth synth-sky130 portfolio soc dv dft pd clean
 
-all: lint regress           ## lint + full regression (the CI gate)
+all: lint regress           ## core gate: lint (0 warnings) + differential regression
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \
@@ -44,7 +41,7 @@ help:
 tools:                      ## install iverilog + verilator (apt)
 	apt-get update && apt-get install -y iverilog verilator
 
-# --- simulation ------------------------------------------------------------
+# --- core simulation + regression (verified RV32IM) ------------------------
 sim:                        ## single-cycle directed golden-trace test
 	bash tools/scripts/run_sim.sh tb_riscv_trace
 
@@ -54,8 +51,9 @@ sim-pipeline:               ## 5-stage pipeline directed golden-trace test
 regress:                    ## full differential regression, both cores
 	bash tools/scripts/regress.sh $(SEEDS) $(INSTR)
 
-# --- lint ------------------------------------------------------------------
-lint: lint-core lint-pipe   ## Verilator lint both cores (0 warnings tolerated)
+# --- lint: core (with justified waivers) + portfolio blocks, 0 warnings ----
+lint: lint-core lint-pipe   ## Verilator lint core + portfolio blocks (0 warnings)
+	$(MAKE) -C riscv-soc lint
 
 lint-core:
 	@echo ">> lint riscv_core (single-cycle)"
@@ -67,10 +65,26 @@ lint-pipe:
 
 # --- synthesis -------------------------------------------------------------
 synth:                      ## generic yosys synth/area for the pipeline
+	@mkdir -p $(BUILD)
 	yosys -s tools/yosys/synth_pipeline.ys
 
 synth-sky130:               ## map pipeline onto the real sky130 PDK
 	bash tools/scripts/synth_sky130.sh riscv_pipeline
 
+# --- interview portfolio tracks --------------------------------------------
+portfolio: soc dv dft pd    ## run all four portfolio tracks
+
+soc:                        ## RTL track: AXI4-Lite SoC (lint + sim + formal)
+	$(MAKE) -C riscv-soc all
+
+dv:                         ## DV track: arbiter formal proofs (yosys-smtbmc)
+	bash riscv-soc-dv/formal/run_arbiter_proof.sh
+
+dft:                        ## DFT track: C++ stuck-at fault simulator
+	$(MAKE) -C riscv-soc-dft/fault_sim run
+
+pd:                         ## PD track: STA timing-violation classifier
+	python3 riscv-soc-pd/timing_cli/tests/test_classify.py
+
 clean:                      ## remove build artifacts
-	rm -rf $(BUILD) *.vcd *.vvp
+	rm -rf $(BUILD) build obj_dir *.vcd *.vvp

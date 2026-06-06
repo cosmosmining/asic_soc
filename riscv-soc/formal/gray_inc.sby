@@ -1,0 +1,16 @@
+# SymbiYosys version of the Gray-pointer proof (same properties as
+# run_gray_proof.sh, for users who have `sby` / oss-cad-suite installed).
+#   sby -f gray_inc.sby
+[options]
+mode prove
+depth 20
+
+[engines]
+smtbmc z3
+
+[script]
+read -formal gray_inc.sv
+prep -top gray_inc
+
+[files]
+gray_inc.sv
