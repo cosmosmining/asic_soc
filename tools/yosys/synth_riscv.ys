@@ -17,5 +17,8 @@ opt -purge
 check -assert
 
 stat
+
+# Ensure the output directory exists (fresh CI checkouts have no build/).
+exec -- mkdir -p build
 write_verilog -noattr build/riscv_core_netlist.v
 write_json build/riscv_core.json

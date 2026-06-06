@@ -77,10 +77,15 @@ def test_autodiscover_real_reports_roundtrip():
     # the repo ships an area report, a timing summary, and a config
     assert "area" in disc and "timing" in disc and "config" in disc
     fm = fmtool.collect(disc.get("area"), disc.get("timing"), disc.get("config"))
-    assert fm.cells == 20789
-    assert fm.timing_met is True
-    assert fm.fmax_mhz == 74.2
+    # Numbers are scraped from the live flow reports (which change when the flow
+    # re-runs), so assert structure + self-consistency rather than magic values.
+    assert isinstance(fm.cells, int) and fm.cells > 0
+    assert fm.area_mm2 and fm.area_mm2 > 0
+    assert fm.clock_period_ns and fm.worst_setup_ns is not None
+    # achieved fmax is derived consistently from the parsed slack + period
+    assert fm.fmax_mhz == round(1000.0 / (fm.clock_period_ns - fm.worst_setup_ns), 1)
+    assert isinstance(fm.timing_met, bool)
     md = fmtool.render_markdown(fm)
-    assert "74.2 MHz" in md and "MET" in md
+    assert "Achieved fmax" in md and str(fm.fmax_mhz) in md
     obj = json.loads(fmtool.to_json(fm))
-    assert obj["fmax_mhz"] == 74.2
+    assert obj["fmax_mhz"] == fm.fmax_mhz and obj["cells"] == fm.cells

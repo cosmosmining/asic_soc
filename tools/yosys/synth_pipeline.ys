@@ -12,4 +12,9 @@ abc -g AND,OR,XOR,MUX
 opt -purge
 check -assert
 stat
+
+# Ensure the output directory exists. A fresh CI checkout has no build/ (it is
+# gitignored and only created by the sim/regress scripts), so write_verilog
+# would fail with "No such file or directory". mkdir -p is idempotent locally.
+exec -- mkdir -p build
 write_verilog -noattr build/riscv_pipeline_netlist.v
