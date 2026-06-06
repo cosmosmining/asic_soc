@@ -1,0 +1,2 @@
+MAGIC_DRC_TOTAL_VIOLATIONS = 0
+Using technology "sky130A", version 1.0.493-0-g0fe599b
