@@ -155,4 +155,16 @@ critique the plan before any code._
   X-tolerant compression or X-bounding; decide per design.
 
 ## riscv-soc-pd (PD track) — decisions
-_Phase 2. Process gate: you write the SDC; I review/critique rather than write it._
+_Process gate: you write the SDC; I review/critique rather than write it._
+
+### D-PD.1 Timing-report classifier
+- **What:** a pip-installable Python CLI that parses OpenSTA/PrimeTime `report_timing` text
+  and buckets each violating path into logic-depth / RC-interconnect / clock-skew with a fix.
+- **Why heuristics, not ML:** the dominant cause is well separated by three cheap features —
+  net-delay fraction, cell-arc count, launch/capture clock-network-delay skew — so transparent
+  thresholds are explainable in an interview and trivially tunable. (ML here would be
+  over-engineering and harder to defend.)
+- **Format choice:** key off the `Delay/Time/Description` rows common to OpenSTA and PrimeTime
+  so one parser serves both the open-source sweep and the CMU PrimeTime runs.
+- **DeepDGR tie-in:** the congestion-vs-prediction plot needs the research model's outputs for
+  this design; carried as a documented stub until those are available (honesty rule).

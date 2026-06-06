@@ -131,8 +131,26 @@ ATPG launch-on-capture vs launch-on-shift, March algorithms beyond C− (couplin
 faults), JTAG TAP 16-state controller, boundary-scan BSDL.
 
 ## riscv-soc-pd (PD track)
-_Seeded in Phase 2. Expect: setup/hold closure, WNS/TNS, utilization vs congestion,
-CTS skew, RC- vs logic-depth-dominated paths, why DeepDGR warm-starts global routing._
+
+**Q. Given a violating path, how do you tell logic-depth from RC from skew problems?**
+Three features off the timing report: (1) net-delay fraction of the path — high means
+interconnect/RC, fix with buffering/placement; (2) cell-arc count between flops — high means
+deep logic, fix by pipelining/restructuring; (3) launch-vs-capture clock-network delay — a big
+gap is clock skew, fix in CTS / useful skew. My CLI automates exactly this bucketing.
+
+**Q. Why thresholds instead of an ML model for the classifier?**
+The three causes separate cleanly on those features, so transparent thresholds are explainable
+and tunable — and I can defend every call in review. ML would be over-engineering and a
+black box for a problem that doesn't need it. (My research is ML-on-PD; this is the opposite
+end on purpose — flow intuition.)
+
+**Q. How does DeepDGR relate to this PD flow?**
+DeepDGR warm-starts global routing with a GNN prediction of congestion, so the router starts
+near a good solution instead of from scratch — that's the ML-on-PD angle. This track is the
+hands-on flow side: actually closing timing and reading the reports.
+
+**Gaps to study (riscv-soc-pd):** PDN/IR-drop signoff, antenna rules, LVS debug, CTS skew vs
+insertion delay tradeoffs, how utilization drives routability, OpenLane2 step internals.
 
 ---
 ## Track-end quizzes (rule 4 — 3 Qs per phase)

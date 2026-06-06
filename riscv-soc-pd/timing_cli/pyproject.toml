@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "timing-cli"
+version = "0.1.0"
+description = "Classify OpenSTA/PrimeTime timing violations (logic depth vs RC vs clock skew) and suggest fixes"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+
+[project.scripts]
+timing-report = "timing_cli.cli:main"
+
+[tool.setuptools]
+packages = ["timing_cli"]

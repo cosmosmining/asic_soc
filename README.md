@@ -37,6 +37,7 @@ Legend: ✅ built & reproduced · 🟡 in progress · ⬜ planned · ⏳ pending
 | 2-ch DMA + round-robin arbiter | concurrent dual-channel copy over the bus **PASS** | riscv-soc | `CI` — iverilog |
 | Arbiter formal safety | grant mutual-exclusion + stability **PROVEN**; **2 real RTL bugs** found+fixed | riscv-soc-dv | `CI` — yosys-smtbmc/z3 |
 | C++ stuck-at fault simulator | c17 **100%** (22/22); redundancy case **62.5%** (flags 3 untestable) | riscv-soc-dft | `CI` — g++ |
+| STA timing-violation classifier | 3/3 causes classified; **pip-installable** CLI | riscv-soc-pd | `CI` — python |
 | DC dynamic power Δ (clock gating) | — | riscv-soc | ⏳ `pending-CMU` |
 | UVM functional coverage ≥95% | — | riscv-soc-dv | ⏳ pending (DV track) |
 | ATPG stuck-at coverage ≥98% | — | riscv-soc-dft | ⏳ pending (DFT track) |

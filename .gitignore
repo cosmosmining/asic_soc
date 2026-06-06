@@ -7,6 +7,9 @@ obj_dir/
 __pycache__/
 *.pyc
 riscv-soc-dft/fault_sim/fault_sim
+*.egg-info/
+build/
+dist/
 tools/.venv/
 tools/pdk/
 tools/OpenLane/

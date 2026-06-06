@@ -34,5 +34,5 @@ dv: ## riscv-soc-dv track — formal proofs (yosys-smtbmc)
 	bash riscv-soc-dv/formal/run_arbiter_proof.sh
 dft: ## riscv-soc-dft track — build + run the C++ fault simulator
 	$(MAKE) -C riscv-soc-dft/fault_sim run
-pd: ## riscv-soc-pd track (Phase 2)
-	@echo "riscv-soc-pd: Phase 2 — not yet implemented"
+pd: ## riscv-soc-pd track — timing-report classifier test
+	python3 riscv-soc-pd/timing_cli/tests/test_classify.py
