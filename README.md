@@ -18,10 +18,10 @@ Legend: ✅ built & reproduced · 🟡 in progress · ⬜ planned · ⏳ pending
 ## Portfolio tracks
 | Track | Dir | Goal (interview angle) | Status |
 |-------|-----|------------------------|--------|
-| RTL / SoC | [`riscv-soc/`](riscv-soc/) | AXI4-Lite SoC around the core — interconnect, boot ROM, SRAM ctrl, UART, timer; async FIFO (CDC showcase), round-robin arbiter + 2-ch DMA; Verilator-lint-clean; clock-gating dynamic-power story | 🟡 Phase 1 |
-| Verification | [`riscv-soc-dv/`](riscv-soc-dv/) | Real UVM evidence — agent/scoreboard/RAL, covergroups, SVA, riscv-dv + Spike co-sim, SymbiYosys formal; **closes the UVM résumé gap** | ⬜ Phase 2 |
-| DFT | [`riscv-soc-dft/`](riscv-soc-dft/) | Scan + ATPG, March C− MBIST, IEEE-1149.1 JTAG TAP, C++ PPSFP fault simulator; pairs with ACTL research | ⬜ Phase 2 |
-| Physical design | [`riscv-soc-pd/`](riscv-soc-pd/) | OpenLane2 / OpenROAD sky130 PPA sweep, PrimeTime/Innovus mirror scripts, pip-installable timing-report CLI, DeepDGR congestion tie-in | ⬜ Phase 2 |
+| RTL / SoC | [`riscv-soc/`](riscv-soc/) | AXI4-Lite SoC around the core — interconnect, boot ROM, SRAM, UART, timer; async FIFO (CDC); round-robin arbiter + 2-ch DMA | 🟢 fabric + FIFO + DMA done; CPU-on-bus, caches/gshare, clock-gating power next |
+| Verification | [`riscv-soc-dv/`](riscv-soc-dv/) | Real UVM evidence — closes the UVM résumé gap | 🟢 formal proofs + 2 real bugs logged; UVM/cocotb/Spike next |
+| DFT | [`riscv-soc-dft/`](riscv-soc-dft/) | Scan/ATPG, March C− MBIST, JTAG TAP, C++ fault simulator | 🟢 C++ fault simulator done; MBIST/JTAG/scan next |
+| Physical design | [`riscv-soc-pd/`](riscv-soc-pd/) | sky130 PPA sweep, PT/Innovus scripts, timing-report CLI, DeepDGR tie-in | 🟢 timing CLI done; OpenLane sweep next |
 
 ## Headline results (résumé table — only measured numbers)
 | Metric | Result | Track | Provenance |

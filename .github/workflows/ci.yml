@@ -47,3 +47,13 @@ jobs:
         run: make -C riscv-soc synth
       - name: DV formal proofs (arbiter safety)
         run: make dv
+
+  dft-pd:
+    name: DFT fault sim + PD timing CLI (blocking)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: DFT — C++ stuck-at fault simulator
+        run: make dft
+      - name: PD — STA timing-violation classifier
+        run: make pd
