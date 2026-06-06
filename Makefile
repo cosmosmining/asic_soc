@@ -65,6 +65,7 @@ lint-pipe:
 
 # --- synthesis -------------------------------------------------------------
 synth:                      ## generic yosys synth/area for the pipeline
+	@mkdir -p $(BUILD)
 	yosys -s tools/yosys/synth_pipeline.ys
 
 synth-sky130:               ## map pipeline onto the real sky130 PDK
