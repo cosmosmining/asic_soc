@@ -1,0 +1,38 @@
+{
+    "//": "OpenLane 2 (Python/Nix flow, aka LibreLane) config for riscv_pipeline.",
+    "//flow": "Run:  cd gds_flow/openlane2 && openlane config.json   (or: openlane --flow Classic config.json). Outputs a routed GDSII + DRC/LVS + OpenSTA multi-corner signoff under runs/<tag>/.",
+    "//sv": "RTL is SystemVerilog; OL2's Yosys reads it via the slang/synlig frontend. Symlink or copy rtl/cpu_riscv/*.sv into ./src, or point VERILOG_FILES at the rtl tree.",
+
+    "DESIGN_NAME": "riscv_pipeline",
+    "VERILOG_FILES": [
+        "dir::src/regfile.sv",
+        "dir::src/alu.sv",
+        "dir::src/divider.sv",
+        "dir::src/riscv_pipeline.sv"
+    ],
+    "VERILOG_INCLUDE_DIRS": ["dir::src"],
+
+    "CLOCK_PORT": "clk",
+    "CLOCK_PERIOD": 20,
+
+    "FP_SIZING": "relative",
+    "FP_CORE_UTIL": 25,
+    "PL_TARGET_DENSITY_PCT": 35,
+
+    "GRT_ALLOW_CONGESTION": true,
+    "GRT_REPAIR_ANTENNAS": true,
+    "RT_MAX_LAYER": "met5",
+    "RUN_HEURISTIC_DIODE_INSERTION": true,
+    "DIODE_ON_PORTS": "none",
+
+    "SYNTH_STRATEGY": "AREA 0",
+    "RUN_POST_GRT_RESIZER_TIMING": false,
+
+    "RUN_LINTER": true,
+    "RUN_CTS": true,
+
+    "pdk::sky130A": {
+        "MAX_FANOUT_CONSTRAINT": 16,
+        "FP_CORE_UTIL": 25
+    }
+}

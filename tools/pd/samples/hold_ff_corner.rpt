@@ -1,0 +1,70 @@
+************************************************************************
+Report : timing
+        -path_type full_clock_expanded
+        -delay_type min
+        -max_paths 200
+        -sort_by slack
+Design : riscv_pipeline
+Version: T-2022.03-SP5
+************************************************************************
+
+Operating Conditions: ff_n40C_1v95   Library: sky130_fd_sc_hd__ff_n40C_1v95
+
+  Startpoint: u_alu/shamt_reg[2]
+              (rising edge-triggered flip-flop clocked by clk)
+  Endpoint: u_alu/shadow_reg[2]
+            (rising edge-triggered flip-flop clocked by clk)
+  Path Group: clk
+  Path Type: min
+
+  Point                                                            Incr       Path 
+  --------------------------------------------------------------------------------
+  clock clk (rise edge)                                          0.0000     0.0000
+  clock network delay (ideal)                                    0.0000     0.0000
+  u_alu/shamt_reg[2]/CK (sky130_fd_sc_hd__dfrtp_1)               0.0000     0.0000 r
+  u_alu/shamt_reg[2]/Q (sky130_fd_sc_hd__dfrtp_1)                0.2000     0.2000 r
+  u_alu/shadow_reg[2]/D (sky130_fd_sc_hd__dfxtp_1)               0.1000     0.3000 r
+  data arrival time                                                         0.3000
+
+  clock clk (rise edge)                                          0.0000     0.0000
+  clock network delay (ideal)                                    0.0000     0.0000
+  u_alu/shadow_reg[2]/CK (sky130_fd_sc_hd__dfxtp_1)              0.0000     0.0000 r
+  library hold time                                              0.3500     0.3500
+  data required time                                                        0.3500
+  --------------------------------------------------------------------------------
+  data required time                                                        0.3500
+  data arrival time                                                         0.3000
+  --------------------------------------------------------------------------------
+  slack (VIOLATED)                                                         -0.0500
+
+  Startpoint: u_wb/data_reg[0]
+              (rising edge-triggered flip-flop clocked by clk)
+  Endpoint: u_wb/sync_reg[0]
+            (rising edge-triggered flip-flop clocked by clk)
+  Path Group: clk
+  Path Type: min
+
+  Point                                                            Incr       Path 
+  --------------------------------------------------------------------------------
+  clock clk (rise edge)                                          0.0000     0.0000
+  clock network delay (ideal)                                    0.0000     0.0000
+  u_wb/data_reg[0]/CK (sky130_fd_sc_hd__dfrtp_1)                 0.0000     0.0000 r
+  u_wb/data_reg[0]/Q (sky130_fd_sc_hd__dfrtp_1)                  0.2000     0.2000 r
+  u_wb/_h0_/A (sky130_fd_sc_hd__buf_1)                           0.1200     0.3200 r
+  u_wb/_h0_/X (sky130_fd_sc_hd__buf_1)                           0.1000     0.4200 f
+  u_wb/_h1_/A (sky130_fd_sc_hd__buf_1)                           0.1200     0.5400 r
+  u_wb/_h1_/X (sky130_fd_sc_hd__buf_1)                           0.1000     0.6400 f
+  u_wb/sync_reg[0]/D (sky130_fd_sc_hd__dfxtp_1)                  0.1000     0.7400 f
+  data arrival time                                                         0.7400
+
+  clock clk (rise edge)                                          0.0000     0.0000
+  clock network delay (ideal)                                    0.0000     0.0000
+  u_wb/sync_reg[0]/CK (sky130_fd_sc_hd__dfxtp_1)                 0.0000     0.0000 r
+  library hold time                                              0.3000     0.3000
+  data required time                                                        0.3000
+  --------------------------------------------------------------------------------
+  data required time                                                        0.3000
+  data arrival time                                                         0.7400
+  --------------------------------------------------------------------------------
+  slack (MET)                                                               0.4400
+

@@ -250,10 +250,58 @@ it is **not** a fully signed-off tapeout.
 
 ---
 
+## Iteration 9 — PD signoff automation (PrimeTime parser + flow scorecard)
+
+**Goal (user priority, "PD teams live in Tcl/Python — show it"):** build the
+day-job automation that turns signoff text into decisions, and frame the whole
+PD story (DeepDGR routing + the Iteration-8 flow + the tooling) coherently.
+
+**Changed**
+- `tools/pd/pt_report_parser.py` — parses PrimeTime/OpenSTA `report_timing`
+  (`-path_type full_clock_expanded`), derives PD features (logic depth,
+  net-vs-cell split, path category, CDC), classifies every violation into a
+  **fix category** (restructure/retime, net/placement-routing, upsize+VT, useful
+  skew, I/O budget, hold-buffer, CDC/constraint), and emits a prioritized Pareto
+  as text/JSON/CSV with a `--fail-on-violation` CI gate.
+- `tools/pd/flow_metrics.py` — scrapes the Iteration-8 `gds_flow/` reports into a
+  one-screen scorecard (cells, area, util target, WNS/TNS, and **achieved fmax =
+  1/(T−WNS)** from the worst setup slack), labeling measured vs. derived. On the
+  current reports: 20,789 cells / 0.201 mm², setup **+6.40 ns ⇒ 73.5 MHz**, with
+  the small **−0.14 ns post-route hold** violation Iteration 8 flagged still open
+  (the parser classifies it as hold-buffer insertion — the right P&R fix).
+- `tools/pd/samples/` + `_gen_samples.py` — representative, arithmetically
+  self-consistent `report_timing` fixtures covering every fix category.
+- `tools/pd/tests/` — **32 pytest cases** (parsing, features, classification,
+  aggregation, JSON/CSV, CLI) — all pass; the flow-metrics test reads the live
+  signoff reports value-agnostically so it survives flow re-runs.
+- `tools/primetime/` — real `pt_shell` multi-corner signoff deck (`mmmc.tcl`,
+  `constraints.sdc`, `report_signoff.tcl`, `run_pt.tcl`): setup@slow / hold@fast
+  / typical-reference with OCV derate, emitting the exact format the parser eats.
+- `gds_flow/openlane2/` — OpenLane 2 (LibreLane) port of the validated OL1 config.
+- `docs/PD_PORTFOLIO.md` — frames **DeepDGR with routing metrics** (overflow,
+  wirelength, runtime — not ML accuracy) and bridges router quality → the
+  net-dominated paths the parser flags. README updated with a PD quick-start.
+
+**Also (flow hygiene):** `tools/yosys/synth_{pipeline,riscv}.ys` now `mkdir -p
+build` before `write_verilog`, fixing the `synth-check` CI job on fresh checkouts
+(build/ is gitignored, so a synth-only runner had no output dir). Verified
+end-to-end with yosys 0.33.
+
+**Verify** — `pytest tools/pd/tests -q`: **32 passed**. Parser classifies all five
+setup fix categories + hold + CDC correctly on the sample corners.
+
+**Honest status:** the Python toolkit runs and is unit-tested here; the PrimeTime
+deck and OL2 config are complete and idiomatic but need commercial PrimeTime / a
+Docker host (not in this CI) — the parser that consumes their output *is* tested
+against representative captures of that exact format.
+
+---
+
 ## Backlog (ordered)
 0. ~~Branch prediction (BTB + 2-bit BHT)~~ ✅ (Iteration 4)
 00. ~~Physical synth (sky130 area) + UVM env + multi-cycle divider~~ ✅ (Iter 5-7)
 000. ~~Real RTL→GDSII on local Docker (sky130/OpenLane)~~ ✅ (Iter 8)
+0000. ~~PD signoff automation (PrimeTime parser + flow scorecard) + multi-corner deck~~ ✅ (Iter 9)
 1. ~~Golden-trace co-sim harness~~ ✅ (Iteration 2)
 2. ~~5-stage pipeline: forwarding, load-use stall, branch flush~~ ✅ (Iteration 2)
 3. ~~DIV/REM (M-extension)~~ ✅ (Iteration 3) — now combinational; multi-cycle later.
