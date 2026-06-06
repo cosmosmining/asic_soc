@@ -6,6 +6,7 @@ build/*.hex
 obj_dir/
 __pycache__/
 *.pyc
+riscv-soc-dft/fault_sim/fault_sim
 tools/.venv/
 tools/pdk/
 tools/OpenLane/

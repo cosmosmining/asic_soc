@@ -1,0 +1,6 @@
+# redundant-fault demo: g is always 0, so g stuck-at-0 is UNDETECTABLE
+INPUT(a)
+OUTPUT(z)
+na = NOT(a)
+g  = AND(a, na)
+z  = OR(a, g)

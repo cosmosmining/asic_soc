@@ -109,8 +109,26 @@ _Seeded in Phase 2. Expect: UVM phasing, RAL frontdoor/backdoor, scoreboard vs p
 functional vs code coverage, SVA for AXI handshake, riscv-dv↔Spike trace compare._
 
 ## riscv-soc-dft (DFT track)
-_Seeded in Phase 2. Expect: stuck-at vs transition faults, scan compression tradeoffs,
-shift power, X-handling/masking, March C− fault coverage, JTAG TAP state machine._
+
+**Q. How does your fault simulator get a 64× speedup?**
+Bit parallelism: each signal's value is a machine word holding 64 independent test patterns,
+so one word-wide AND/OR/XOR evaluates a gate for 64 patterns at once (PPSFP). One fault-free
+pass, then per fault I force the stuck line and re-simulate; a fault is detected if any PO
+word differs from the good word.
+
+**Q. How do you know it actually works and isn't just reporting 100%?**
+I run it on a circuit with a *structurally redundant* fault (`g = a AND !a`, always 0). The
+simulator reports 62.5% and flags the 3 untestable faults (g SA0 and both na faults, since the
+output equals `a` regardless) — exactly the redundancy you'd expect. c17, which is fully
+testable, comes back 100%.
+
+**Q. Why is stuck-at not enough for modern parts?**
+It misses timing-dependent defects — you also need transition (slow-to-rise/fall) and
+path-delay faults, run at-speed. And bridging/cell-aware models for real silicon.
+
+**Gaps to study (riscv-soc-dft):** scan compression internals (EDT/MISR), at-speed transition
+ATPG launch-on-capture vs launch-on-shift, March algorithms beyond C− (coupling/neighborhood
+faults), JTAG TAP 16-state controller, boundary-scan BSDL.
 
 ## riscv-soc-pd (PD track)
 _Seeded in Phase 2. Expect: setup/hold closure, WNS/TNS, utilization vs congestion,

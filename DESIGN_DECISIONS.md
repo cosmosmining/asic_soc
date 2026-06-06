@@ -134,7 +134,25 @@ _Phase 2. Process gate: you write the verification plan first; I interview on th
 critique the plan before any code._
 
 ## riscv-soc-dft (DFT track) — decisions
-_Phase 2. Must cover: chain count vs compression, shift power, X-handling._
+
+### D-DFT.1 Fault simulator (parallel-pattern stuck-at)
+- **Design:** bit-parallel (PPSFP-style) — pack 64 random patterns per machine word, one
+  fault-free reference pass, then inject each line stuck-at-0/1 and re-simulate, marking a
+  fault detected if any PO bit differs. Coverage = detected / total line faults.
+- **Why bit-parallel:** 64× speedup over one-pattern-at-a-time for free via word ops; the
+  classic CPU fault-sim trick. Validated on c17 (100%, fully testable) and a redundant
+  circuit (62.5% — the simulator correctly flags the 3 structurally-untestable faults
+  instead of always reporting 100%).
+- **Scope note:** signal-level fault list (every PI + gate output, SA0/SA1). Real ATPG uses a
+  collapsed checkpoint list; the absolute count differs but the coverage methodology matches.
+
+### Scan tradeoffs to document (scan/ATPG flow — pending CMU/Fault)
+- **chain count vs compression:** more chains shorten shift (test time ↓) but cost routing +
+  pins; on-chip compression (e.g. EDT) decouples pattern volume from chain count.
+- **shift power:** scan shift toggles ~every FF every cycle — far above functional activity;
+  mitigate with low-power ATPG / shift-clock gating to avoid IR-drop test failures.
+- **X-handling:** unknowns (uninit RAM, black boxes) corrupt MISR signatures → mask with
+  X-tolerant compression or X-bounding; decide per design.
 
 ## riscv-soc-pd (PD track) — decisions
 _Phase 2. Process gate: you write the SDC; I review/critique rather than write it._
