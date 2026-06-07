@@ -1,0 +1,49 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/hooks/post_edit_lint.py\""
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(make lint)",
+      "Bash(make lint-core)",
+      "Bash(make lint-pipe)",
+      "Bash(make lint-soc)",
+      "Bash(make sim)",
+      "Bash(make sim-pipeline)",
+      "Bash(make regress)",
+      "Bash(make regress *)",
+      "Bash(make sim-soc)",
+      "Bash(make formal)",
+      "Bash(make synth)",
+      "Bash(make synth-soc)",
+      "Bash(make regs)",
+      "Bash(make metrics)",
+      "Bash(make help)",
+      "Bash(verilator *)",
+      "Bash(yosys *)",
+      "Bash(yosys -s *)",
+      "Bash(iverilog *)",
+      "Bash(vvp *)",
+      "Bash(sby *)",
+      "Bash(python3 tools/scripts/rvasm.py *)",
+      "Bash(python3 scripts/metrics.py)",
+      "Bash(python3 sim/cocotb/run_soc.py)",
+      "Bash(bash tools/scripts/run_sim.sh *)",
+      "Bash(bash tools/scripts/regress.sh *)",
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)"
+    ]
+  }
+}

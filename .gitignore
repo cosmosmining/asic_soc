@@ -11,4 +11,11 @@ __pycache__/
 sim_build/
 results.xml
 reports/*.json
+reports/*.log
 flow/**/*.log
+# SymbiYosys work dirs (created next to each .sby)
+flow/formal/alu/
+flow/formal/pipeline_safety/
+# PeakRDL output -- regenerate with `make regs`
+rtl/generated/
+docs/regs/

@@ -158,7 +158,7 @@ module csr #(
 
             // --- trap entry / MRET / ordinary CSR writes (mutually exclusive) ---
             if (trap) begin
-                mepc         <= {trap_epc[XLEN-1:1], 1'b0};   // IALIGN=32 -> [1:0]=0
+                mepc         <= {trap_epc[XLEN-1:2], 2'b00};  // IALIGN=32 -> mepc[1:0]=0
                 mcause       <= trap_cause;
                 mtval        <= trap_tval;
                 mstatus_mpie <= mstatus_mie;
@@ -175,7 +175,7 @@ module csr #(
                     `CSR_MIE     : mie      <= csr_wval & 32'h0000_0888; // MSIE/MTIE/MEIE
                     `CSR_MTVEC   : mtvec    <= csr_wval;
                     `CSR_MSCRATCH: mscratch <= csr_wval;
-                    `CSR_MEPC    : mepc     <= {csr_wval[XLEN-1:1], 1'b0};
+                    `CSR_MEPC    : mepc     <= {csr_wval[XLEN-1:2], 2'b00};   // WARL: IALIGN=32
                     `CSR_MCAUSE  : mcause   <= csr_wval;
                     `CSR_MTVAL   : mtval    <= csr_wval;
                     default      : ; // misa/mip/counters/RO handled elsewhere or WARL no-op

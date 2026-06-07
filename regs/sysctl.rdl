@@ -1,0 +1,36 @@
+// sysctl.rdl - SystemRDL description of a SoC system-control/status block.
+//
+// Single source of truth for one peripheral's register map: `make regs` exports
+// synthesizable SystemVerilog (the register block), HTML documentation, a C
+// header for firmware, and a UVM register model -- all from this one file, so
+// the RTL, the firmware view and the docs can never drift apart.
+addrmap sysctl {
+    name = "SoC system control / status";
+    desc = "Scratch, build identity, LED drive and core status registers.";
+    default regwidth = 32;
+
+    reg {
+        name = "Scratch";
+        desc = "General-purpose read/write scratch register.";
+        field { sw = rw; hw = r; } value[31:0] = 0;
+    } SCRATCH @ 0x00;
+
+    reg {
+        name = "Build ID";
+        desc = "Read-only build/version identifier set at synthesis.";
+        field { sw = r; hw = w; } id[31:0] = 0;
+    } BUILD_ID @ 0x04;
+
+    reg {
+        name = "LED control";
+        desc = "Drives the board LEDs.";
+        field { sw = rw; hw = r; desc = "Per-LED on/off."; } led[7:0] = 0;
+    } LED @ 0x08;
+
+    reg {
+        name = "Status";
+        desc = "Live core/system status (read-only to software).";
+        field { sw = r; hw = w; desc = "Core is in WFI/halt.";        } core_halted[0:0];
+        field { sw = r; hw = w; desc = "Machine timer interrupt pending."; } timer_pending[1:1];
+    } STATUS @ 0x0C;
+};

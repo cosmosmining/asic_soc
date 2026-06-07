@@ -1,0 +1,16 @@
+[options]
+mode bmc
+depth 1
+
+[engines]
+smtbmc z3
+
+[script]
+read_verilog -sv -formal -I . alu.sv
+read_verilog -sv -formal -I . alu_formal.sv
+prep -top alu_formal
+
+[files]
+rtl/common/riscv_defs.svh
+rtl/cpu_riscv/alu.sv
+flow/formal/alu_formal.sv
