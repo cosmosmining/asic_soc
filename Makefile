@@ -50,7 +50,7 @@ help:
 tools:                      ## install the open-source toolchain (apt + pip)
 	sudo apt-get update && sudo apt-get install -y iverilog verilator yosys
 	pip install -q cocotb cocotb-bus peakrdl peakrdl-regblock peakrdl-uvm \
-	    peakrdl-c-header peakrdl-html z3-solver
+	    peakrdl-cheader peakrdl-html z3-solver
 
 # --- lint ------------------------------------------------------------------
 lint: lint-core lint-pipe lint-soc  ## Verilator lint (0 warnings tolerated)

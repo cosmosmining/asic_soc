@@ -24,7 +24,7 @@ jobs:
       - name: Install Python flow tools (cocotb, PeakRDL, z3)
         run: |
           pip install --quiet cocotb cocotb-bus z3-solver \
-            peakrdl peakrdl-regblock peakrdl-uvm peakrdl-c-header peakrdl-html
+            peakrdl peakrdl-regblock peakrdl-uvm peakrdl-cheader peakrdl-html
 
       - name: Install SymbiYosys (formal)
         run: |
