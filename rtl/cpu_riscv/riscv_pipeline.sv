@@ -18,11 +18,13 @@ module riscv_pipeline #(
     input  logic            rst_n,
     output logic [XLEN-1:0] imem_addr,
     input  logic [XLEN-1:0] imem_rdata,
+    input  logic            imem_ready,   // fetched instruction valid this cycle
     output logic [XLEN-1:0] dmem_addr,
     output logic [XLEN-1:0] dmem_wdata,
     output logic [3:0]      dmem_be,
     output logic            dmem_we,
     input  logic [XLEN-1:0] dmem_rdata,
+    input  logic            dmem_ready,   // load data valid this cycle
     // machine interrupt lines (level, from the platform: CLINT/peripherals)
     input  logic            sw_irq,
     input  logic            timer_irq,
@@ -43,6 +45,16 @@ module riscv_pipeline #(
     logic [XLEN-1:0] redirect_pc;
     logic            div_stall;    // multi-cycle divide in flight (freezes front-end)
     wire             front_stall = stall || div_stall;
+
+    // ---- synchronous-memory wait support (no-op when *_ready tied 1) ---------
+    // imem_ready=0 -> the instruction for the current PC is not on imem_rdata yet
+    // (a registered-read SRAM): hold PC and bubble IF/ID until it arrives.
+    // mem_wait -> a load is in MEM and its read data is not ready: freeze the
+    // pipeline (pc/de/ex/em hold, WB bubbles) and gate every EX-stage commit
+    // effect, so the frozen instruction is a no-op until the data lands. Both
+    // collapse to zero stalls when the memory answers combinationally (ready=1).
+    wire             if_wait = !imem_ready;
+    logic            mem_wait;
 
     // ---- dynamic branch predictor: direct-mapped BTB + 2-bit BHT ------------
     // Tagged by the full pc[31:2], so a hit is always the exact same PC that
@@ -71,10 +83,10 @@ module riscv_pipeline #(
     assign predict_target = btb_target[if_idx];
 
     always_comb begin
-        if      (redirect)       pc_next = redirect_pc;     // mispredict recovery
-        else if (front_stall)    pc_next = pc;              // load-use / divide hold
-        else if (predict_taken)  pc_next = predict_target;  // predicted taken
-        else                     pc_next = pc + 32'd4;
+        if      (redirect)                            pc_next = redirect_pc;     // mispredict recovery
+        else if (front_stall || mem_wait || if_wait) pc_next = pc;              // stall / memory wait hold
+        else if (predict_taken)                      pc_next = predict_target;  // predicted taken
+        else                                         pc_next = pc + 32'd4;
     end
 
     always_ff @(posedge clk or negedge rst_n) begin
@@ -101,8 +113,12 @@ module riscv_pipeline #(
             de_valid      <= 1'b0;      // flush younger (wrong-path) instruction
             de_inst       <= 32'h0;
             de_pred_taken <= 1'b0;
-        end else if (front_stall) begin
-            // hold IF/ID (load-use or divide)
+        end else if (mem_wait || front_stall) begin
+            // hold IF/ID (memory load wait / load-use / divide)
+        end else if (if_wait) begin
+            de_valid      <= 1'b0;      // fetched instruction not ready -> bubble
+            de_inst       <= 32'h0;
+            de_pred_taken <= 1'b0;
         end else begin
             de_valid       <= 1'b1;
             de_pc          <= pc;
@@ -303,8 +319,8 @@ module riscv_pipeline #(
             ex_pred_taken <= 1'b0;
             ex_is_csr     <= 1'b0; ex_is_ecall <= 1'b0;
             ex_is_ebreak  <= 1'b0; ex_is_mret  <= 1'b0; ex_legal <= 1'b1;
-        end else if (div_stall) begin
-            // hold the divide instruction in EX until the divider completes
+        end else if (div_stall || mem_wait) begin
+            // hold EX: divide in flight, or a load in MEM waiting for its data
         end else if (ex_bubble) begin
             ex_valid      <= 1'b0;
             ex_reg_write  <= 1'b0;
@@ -508,28 +524,32 @@ module riscv_pipeline #(
     // because mepc is latched to its PC.
     logic            irq_req;
     logic [XLEN-1:0] irq_cause;
-    wire int_take = irq_req && ex_valid && !trap && !div_stall;
+    wire int_take = irq_req && ex_valid && !trap && !div_stall && !mem_wait;
 
     csr #(.XLEN(XLEN)) u_csr (
         .clk, .rst_n,
         .csr_addr(ex_csr_addr), .csr_op(ex_csr_op), .csr_wsrc(csr_wsrc),
-        .csr_we(ex_valid && csr_we_intent),  // csr suppresses the write on illegal/trap
+        // all EX-stage commit effects are gated by !mem_wait: while a load in MEM
+        // is stalling the pipeline the frozen EX instruction must not write a CSR,
+        // take a trap, retire an MRET or bump minstret -- it does so once, when it
+        // finally advances.
+        .csr_we(ex_valid && csr_we_intent && !mem_wait),  // also suppressed on illegal/trap
         .csr_rdata(csr_rdata), .csr_illegal(csr_illegal),
-        .trap(ex_trap || int_take),
+        .trap((ex_trap || int_take) && !mem_wait),
         .trap_cause(int_take ? irq_cause : trap_cause),
         .trap_epc(ex_pc),
         .trap_tval(int_take ? '0 : trap_tval),
-        .mret(ex_do_mret),
+        .mret(ex_do_mret && !mem_wait),
         .trap_target(csr_trap_target), .mret_target(csr_mret_target),
         .sw_irq(sw_irq), .timer_irq(timer_irq), .ext_irq(ext_irq),
         .irq_req(irq_req), .irq_cause(irq_cause),
-        .instret_inc(ex_valid && !div_stall && !ex_trap && !int_take) // EX-stage retirements
+        .instret_inc(ex_valid && !div_stall && !ex_trap && !int_take && !mem_wait)
     );
 
     // Redirect on: interrupt or synchronous trap (-> mtvec), MRET (-> mepc), or
     // a branch mispredict (fetched-next-pc != real-next-pc).
-    assign redirect = ex_trap || int_take || ex_do_mret ||
-                      (ex_valid && (actual_nextpc != pred_nextpc));
+    assign redirect = !mem_wait && (ex_trap || int_take || ex_do_mret ||
+                      (ex_valid && (actual_nextpc != pred_nextpc)));
     always_comb begin
         if      (ex_trap)    redirect_pc = csr_trap_target;
         else if (int_take)   redirect_pc = csr_trap_target;
@@ -547,7 +567,7 @@ module riscv_pipeline #(
                 btb_uncond[bi] <= 1'b0;
                 bht[bi]        <= 2'b01;     // weakly not-taken
             end
-        end else if (ex_valid && ex_is_ctrl && !ex_trap) begin
+        end else if (ex_valid && ex_is_ctrl && !ex_trap && !mem_wait) begin
             if (actual_taken) begin          // allocate / refresh target on taken
                 btb_valid[ex_idx]  <= 1'b1;
                 btb_uncond[ex_idx] <= ex_jump;
@@ -567,6 +587,9 @@ module riscv_pipeline #(
                    ((c_uses_rs1 && de_rs1 == ex_rd) ||
                     (c_uses_rs2 && de_rs2 == ex_rd));
 
+    // a load in MEM whose read data has not arrived yet (synchronous data SRAM)
+    assign mem_wait = em_valid && (em_wb_sel == WB_MEM) && !dmem_ready;
+
     // ====================================================== EX/MEM register
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -574,6 +597,8 @@ module riscv_pipeline #(
             em_reg_write <= 1'b0;
             em_mem_write <= 1'b0;
             em_rd        <= 5'd0;
+        end else if (mem_wait) begin
+            // hold the load in MEM (and everything upstream) until its data lands
         end else if (div_stall) begin
             // insert a bubble into MEM while the divide is still computing
             em_valid     <= 1'b0;
@@ -650,6 +675,9 @@ module riscv_pipeline #(
             wb_reg_write <= 1'b0;
             wb_rd        <= 5'd0;
             wb_wdata     <= '0;
+        end else if (mem_wait) begin
+            wb_valid     <= 1'b0;       // load data not ready -> nothing retires
+            wb_reg_write <= 1'b0;
         end else begin
             wb_valid     <= em_valid;
             wb_reg_write <= em_valid && em_reg_write && (em_rd != 5'd0);
@@ -671,6 +699,8 @@ module riscv_pipeline #(
         if (!rst_n) begin
             em_pc_r <= '0;
             wb_pc_r <= '0;
+        end else if (mem_wait) begin
+            // hold in lock-step with the frozen EX/MEM stages
         end else begin
             em_pc_r <= ex_pc;
             wb_pc_r <= em_pc_r;

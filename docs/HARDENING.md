@@ -28,16 +28,24 @@ synthesises it to standard cells alongside the logic. Self-contained (no macro
 generation), and functionally *exactly* what cocotb verifies. Cost: area — flops
 are ~6–10× the density of an SRAM bitcell. Fine for a small RAM on sky130.
 
-**B. Compiled SRAM macro (area-optimised).**
-Swap the RAM for an OpenRAM `1rw1r` (or DFFRAM) macro: `make synth-soc-macro`
-already blackboxes `soc_ram` and emits a top netlist with the RAM as a single
-instance (SoC **logic ≈ 19.3 k cells**, RAM excluded). In ORFS, add the macro's
+**B. Compiled SRAM macro (area-optimised) — implemented.**
+A compiled SRAM is synchronous-read, so the core carries a one-cycle
+**memory-wait**: `imem_ready`/`dmem_ready` inputs (`riscv_pipeline.sv`) stall the
+front-end on fetch and freeze the pipeline on a load until the data lands, gating
+every EX-stage commit effect so a frozen instruction is a perfect no-op. It is a
+no-op when the memory answers combinationally (ready tied 1), so the async path
+is byte-identical. `rtl/soc/soc_ram_sync.sv` models the macro (registered read +
+ready), and `soc_top`/`soc_chip` select it with `SYNC_MEM=1`. Harden it via
+`make synth-soc-macro` (tops at `soc_chip`, blackboxes `soc_ram_sync` -> SoC
+**logic ≈ 19.3 k cells**, RAM a single macro instance); in ORFS add the macro's
 `.lef`/`.lib`/`.gds` (`ADDITIONAL_LEFS`, `*_LIB`) and place it with macro
-placement. **Prerequisite RTL:** a compiled SRAM is synchronous-read, so the core
-needs a one-cycle **memory-wait** (registered fetch + a load stall) to use it.
-That change is functionally verifiable locally (regression + cocotb) and is the
-one remaining RTL item before path B is drop-in. A DFFRAM flop-macro keeps the
-async read and needs no core change, trading area for simplicity.
+placement. A DFFRAM flop-macro is the async alternative (path A), trading area
+for simplicity.
+
+The memory-wait is verified: `make sync-regress` runs the differential golden
+trace against a synchronous memory over directed + 100 random programs, and
+`make sim-soc` runs the firmware on both the async and synchronous SoC (the
+synchronous run exercises fetch + load stalls end to end).
 
 ## Flow
 
@@ -60,7 +68,11 @@ docker image or via Nix/LibreLane.
   (logic ≈ 19.3 k cells, RAM a single macro instance), `check -assert` clean.
 - ✅ ORFS config + SDC wired for the full SoC; the inline-RAM path is runnable
   on a PDK host with no extra collateral.
+- ✅ Path B's synchronous-read **memory-wait is implemented and verified**
+  (`make sync-regress`: directed + 100 random programs vs the golden ISS;
+  `make sim-soc`: firmware on the synchronous SoC). The async path stays
+  byte-identical (ready tied 1), and the safety BMC now proves PC/data alignment
+  under *arbitrary* memory latency.
 - ⏳ Host stages (PnR/STA/DRC/LVS) not run here — no PDK/OpenROAD in this
-  environment. The pipeline's `gds_flow/` is the proven reference.
-- ⏳ Path B's synchronous-read memory-wait is the remaining RTL change for a
-  compiled-SRAM die; path A needs none.
+  environment. The pipeline's `gds_flow/` is the proven reference; running
+  `make pnr DESIGN=soc` on a PDK host produces the SoC GDSII.

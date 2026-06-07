@@ -341,7 +341,45 @@ locally verifiable (regression + cocotb) — the natural next iteration.
 
 ---
 
+## Iteration 12 — synchronous-memory support (compiled-SRAM enabler, path B)
+
+**Goal (user ask):** finish path B — let the SoC use a real compiled SRAM macro
+(synchronous read) instead of flop RAM.
+
+**Changed**
+- `riscv_pipeline.sv`: added `imem_ready`/`dmem_ready` and a memory-wait. `if_wait`
+  (fetch not ready) holds PC and bubbles IF/ID; `mem_wait` (load in MEM, data not
+  ready) freezes pc/de/ex/em and bubbles WB, with **every EX-stage commit effect
+  gated by `!mem_wait`** (redirect, CSR trap/mret/write, minstret, predictor
+  training, interrupt) so a frozen instruction is a perfect no-op until it
+  advances. `mem_wait` has priority over `div_stall`; `redirect` over `mem_wait`.
+- `rtl/soc/soc_ram_sync.sv`: synchronous (registered-read) RAM modelling an
+  OpenRAM 1rw1r / DFFRAM macro, with per-port ready. `soc_top` gains `SYNC_MEM`
+  (generate-selects async `soc_ram` or sync `soc_ram_sync` and routes ready);
+  `soc_chip` defaults to `SYNC_MEM=1`. `make synth-soc-macro` blackboxes
+  `soc_ram_sync` as the macro.
+- Verification: `tb/directed/tb_riscv_sync.sv` + `make sync-regress` (golden-trace
+  vs a synchronous memory); cocotb `make sim-soc` now runs the firmware on BOTH
+  the async and synchronous SoC; the safety BMC drives `imem_ready`/`dmem_ready`
+  free (`anyseq`).
+
+**Verify (local):** the design is a **no-op when ready=1** by construction, so the
+async differential regression stays byte-identical (PASS both cores). New:
+**sync-regress PASS** (directed + random, synchronous memory); **cocotb 2/2 on
+both** async and synchronous SoC (HELLO SOC + 5 timer interrupts through fetch +
+load stalls); **formal safety BMC PASS** now under arbitrary memory latency; lint
+clean. CPI rises (~2x on the naive synchronous RAM) -- the expected throughput
+cost of the stall model; pipelined fetch (1 IPC) is the future optimisation.
+
+**Honest status** — the CPU + SoC now drive a synchronous, macro-compatible RAM,
+verified end to end. The compiled SRAM macro generation (OpenRAM) and the host
+PnR/STA/DRC/LVS still run on a PDK host (no PDK/OpenROAD here); `make pnr
+DESIGN=soc` is wired and ready.
+
+---
+
 ## Backlog (ordered)
+0e. ~~Synchronous-memory support (memory-wait) for a compiled SRAM macro~~ ✅ (Iteration 12)
 0d. ~~Full-SoC hardening setup: soc_chip + macro-blackbox synth + ORFS config~~ ✅ (Iteration 11)
 0. ~~Branch prediction (BTB + 2-bit BHT)~~ ✅ (Iteration 4)
 00b. ~~Integrated SoC (RAM/CLINT/UART/GPIO) + machine interrupts + cocotb~~ ✅ (Iteration 10)

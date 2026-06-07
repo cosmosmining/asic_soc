@@ -10,7 +10,9 @@ pass/fail exit code plus a machine-readable summary.
 
 - **CPU**: 5-stage in-order RV32IM pipeline (`rtl/cpu_riscv/riscv_pipeline.sv`) —
   forwarding, load-use stall, BTB+BHT branch prediction, multi-cycle mul/div,
-  machine-mode CSRs/traps, **and machine interrupts** (timer/software/external).
+  machine-mode CSRs/traps, machine interrupts (timer/software/external), **and an
+  `imem_ready`/`dmem_ready` memory-wait** so it can drive a synchronous compiled
+  SRAM (a no-op when ready is tied 1 → the async path is byte-identical).
   A single-cycle core (`riscv_core.sv`) is the independent golden reference.
 - **SoC** (`rtl/soc/soc_top.sv`): CPU + single-cycle RAM + CLINT machine timer +
   UART + GPIO, integrated over a combinational address-decoded bus.
@@ -41,7 +43,8 @@ in flight. The interrupted instruction is fully squashed and re-executes after
 | Register gen       | `make regs`        | PeakRDL emits RTL/header/UVM/HTML        | yes           |
 | Directed sim       | `make sim`         | golden-trace match                      | yes           |
 | Regression         | `make regress`     | directed + N random, both cores         | yes           |
-| SoC sim (cocotb)   | `make sim-soc`     | UART banner + NIRQ interrupts serviced  | yes           |
+| Sync-mem regress   | `make sync-regress`| golden trace vs a synchronous SRAM      | yes           |
+| SoC sim (cocotb)   | `make sim-soc`     | UART banner + NIRQ interrupts (async+sync) | yes        |
 | Formal             | `make formal`      | ALU equiv + pipeline safety BMC pass    | yes           |
 | Synthesis          | `make synth-soc`   | elaborates, `check -assert` clean       | yes           |
 | sky130 map         | `make synth-sky130`| maps to std cells                       | needs PDK     |
@@ -50,7 +53,7 @@ in flight. The interrupted instruction is fully squashed and re-executes after
 | DRC / LVS          | `make drc` `make lvs` | 0 DRC, 0 LVS                         | host stage    |
 | Metrics            | `make metrics`     | writes `reports/summary.json`           | yes           |
 
-`make all` = lint + regress + sim-soc + formal (the CI gate). Host stages need
+`make all` = lint + regress + sync-regress + sim-soc + formal (the CI gate). Host stages need
 the sky130 PDK and the heavy tools; they degrade with guidance (see docs/FLOW.md
 and gds_flow/ for the proven OpenLane GDSII).
 

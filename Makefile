@@ -27,8 +27,8 @@ RTL_CORE := rtl/cpu_riscv/regfile.sv rtl/cpu_riscv/csr.sv rtl/cpu_riscv/alu.sv \
             rtl/cpu_riscv/riscv_core.sv
 RTL_PIPE := rtl/cpu_riscv/regfile.sv rtl/cpu_riscv/csr.sv rtl/cpu_riscv/alu.sv \
             rtl/cpu_riscv/divider.sv rtl/cpu_riscv/mul_seq.sv rtl/cpu_riscv/riscv_pipeline.sv
-RTL_SOC  := $(RTL_PIPE) rtl/soc/soc_ram.sv rtl/soc/mtimer.sv rtl/soc/uart_tx.sv \
-            rtl/soc/gpio.sv rtl/soc/soc_top.sv rtl/soc/soc_chip.sv
+RTL_SOC  := $(RTL_PIPE) rtl/soc/soc_ram.sv rtl/soc/soc_ram_sync.sv rtl/soc/mtimer.sv \
+            rtl/soc/uart_tx.sv rtl/soc/gpio.sv rtl/soc/soc_top.sv rtl/soc/soc_chip.sv
 
 # --- tools -----------------------------------------------------------------
 VERILATOR := verilator
@@ -39,10 +39,10 @@ SEEDS ?= 50
 INSTR ?= 64
 
 .PHONY: all tools lint lint-core lint-pipe lint-soc regs sim sim-pipeline regress \
-        sim-soc formal synth synth-soc synth-soc-macro synth-sky130 sta pnr drc lvs \
-        metrics clean help
+        sync-regress sim-soc formal synth synth-soc synth-soc-macro synth-sky130 \
+        sta pnr drc lvs metrics clean help
 
-all: lint regress sim-soc formal   ## the CI gate (lint + regression + SoC + formal)
+all: lint regress sync-regress sim-soc formal  ## the CI gate (+ synchronous-memory regression)
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \
@@ -81,6 +81,9 @@ sim-pipeline:               ## directed golden-trace test (5-stage pipeline)
 
 regress:                    ## differential regression, both cores + random
 	bash tools/scripts/regress.sh $(SEEDS) $(INSTR)
+
+sync-regress:               ## differential regression vs a SYNCHRONOUS SRAM (memory-wait)
+	bash tools/scripts/regress_sync.sh $(SEEDS) $(INSTR)
 
 sim-soc:                    ## cocotb SoC test (UART + machine-timer interrupts)
 	python3 sim/cocotb/run_soc.py

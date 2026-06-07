@@ -12,6 +12,7 @@ read_verilog -sv -I rtl/common \
     rtl/cpu_riscv/mul_seq.sv \
     rtl/cpu_riscv/riscv_pipeline.sv \
     rtl/soc/soc_ram.sv \
+    rtl/soc/soc_ram_sync.sv \
     rtl/soc/mtimer.sv \
     rtl/soc/uart_tx.sv \
     rtl/soc/gpio.sv \

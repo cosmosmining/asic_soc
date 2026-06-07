@@ -18,6 +18,7 @@ module soc_top #(
     parameter int    UART_DIV     = 16,          // core clocks per UART bit
     parameter int    TICK_DIV     = 1,           // core clocks per mtime tick
     parameter int    GPIO_W       = 32,
+    parameter int    SYNC_MEM     = 0,           // 1 = synchronous RAM (SRAM macro)
     parameter logic [31:0] RESET_PC = 32'h0000_0000
 ) (
     input  logic              clk,
@@ -47,10 +48,11 @@ module soc_top #(
 
     assign dbg_timer_irq = timer_irq;
 
+    logic imem_rdy, dmem_rdy;
     riscv_pipeline #(.XLEN(32), .RESET_PC(RESET_PC)) u_cpu (
         .clk, .rst_n,
-        .imem_addr, .imem_rdata,
-        .dmem_addr, .dmem_wdata, .dmem_be, .dmem_we, .dmem_rdata,
+        .imem_addr, .imem_rdata, .imem_ready(imem_rdy),
+        .dmem_addr, .dmem_wdata, .dmem_be, .dmem_we, .dmem_rdata, .dmem_ready(dmem_rdy),
         .sw_irq(sw_irq), .timer_irq(timer_irq), .ext_irq(1'b0),
         .dbg_pc,
         .rvfi_valid, .rvfi_pc, .rvfi_rd, .rvfi_we, .rvfi_wdata
@@ -63,14 +65,33 @@ module soc_top #(
     wire sel_gpio  = (dmem_addr[31:16] == `GPIO_PAGE);
     wire [15:0] offs = dmem_addr[15:0];
 
-    // ---- RAM (fetch + data) -------------------------------------------------
+    // ---- RAM (fetch + data): async single-cycle, or synchronous SRAM macro --
     logic [31:0] ram_rdata;
-    soc_ram #(.WORDS(RAM_WORDS), .INITFILE(INITFILE)) u_ram (
-        .clk,
-        .i_addr(imem_addr), .i_rdata(imem_rdata),
-        .d_addr(dmem_addr), .d_wdata(dmem_wdata), .d_be(dmem_be),
-        .d_we(dmem_we && sel_ram), .d_rdata(ram_rdata)
-    );
+    logic        ram_i_ready, ram_d_ready;
+    generate
+        if (SYNC_MEM != 0) begin : g_sync_ram
+            soc_ram_sync #(.WORDS(RAM_WORDS), .INITFILE(INITFILE)) u_ram (
+                .clk, .rst_n,
+                .i_addr(imem_addr), .i_rdata(imem_rdata), .i_ready(ram_i_ready),
+                .d_addr(dmem_addr), .d_wdata(dmem_wdata), .d_be(dmem_be),
+                .d_we(dmem_we && sel_ram), .d_rdata(ram_rdata), .d_ready(ram_d_ready)
+            );
+        end else begin : g_async_ram
+            soc_ram #(.WORDS(RAM_WORDS), .INITFILE(INITFILE)) u_ram (
+                .clk,
+                .i_addr(imem_addr), .i_rdata(imem_rdata),
+                .d_addr(dmem_addr), .d_wdata(dmem_wdata), .d_be(dmem_be),
+                .d_we(dmem_we && sel_ram), .d_rdata(ram_rdata)
+            );
+            assign ram_i_ready = 1'b1;
+            assign ram_d_ready = 1'b1;
+        end
+    endgenerate
+
+    // memory-wait readiness to the CPU. Fetch is always RAM; for data, the
+    // peripherals answer combinationally (ready=1) and only RAM carries latency.
+    assign imem_rdy = ram_i_ready;
+    assign dmem_rdy = sel_ram ? ram_d_ready : 1'b1;
 
     // ---- CLINT machine timer ------------------------------------------------
     logic [31:0] clint_rdata;

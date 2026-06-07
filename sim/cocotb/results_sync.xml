@@ -1,0 +1,7 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1780875521" />
+    <testcase name="test_hello_irq" classname="test_soc" file="/home/user/asic_soc/sim/cocotb/test_soc.py" lineno="67" time="0.33371734619140625" sim_time_ns="25610.0" ratio_time="76741.59072723532" />
+    <testcase name="test_reset_pc" classname="test_soc" file="/home/user/asic_soc/sim/cocotb/test_soc.py" lineno="110" time="0.0011425018310546875" sim_time_ns="90.0" ratio_time="78774.49081803006" />
+  </testsuite>
+</testsuites>

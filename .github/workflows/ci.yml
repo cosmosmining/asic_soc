@@ -41,7 +41,10 @@ jobs:
       - name: Functional regression (both cores, directed + random)
         run: make regress SEEDS=150 INSTR=80
 
-      - name: SoC test (cocotb — UART + machine-timer interrupts)
+      - name: Synchronous-memory regression (memory-wait / SRAM path)
+        run: make sync-regress SEEDS=100 INSTR=80
+
+      - name: SoC test (cocotb — UART + interrupts, async + synchronous RAM)
         run: make sim-soc
 
       - name: Formal (ALU equivalence + pipeline safety BMC)

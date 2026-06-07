@@ -19,7 +19,8 @@ ROOT = Path(__file__).resolve().parents[2]
 RTL = [
     "rtl/cpu_riscv/regfile.sv", "rtl/cpu_riscv/csr.sv", "rtl/cpu_riscv/alu.sv",
     "rtl/cpu_riscv/divider.sv", "rtl/cpu_riscv/mul_seq.sv", "rtl/cpu_riscv/riscv_pipeline.sv",
-    "rtl/soc/soc_ram.sv", "rtl/soc/mtimer.sv", "rtl/soc/uart_tx.sv", "rtl/soc/gpio.sv",
+    "rtl/soc/soc_ram.sv", "rtl/soc/soc_ram_sync.sv", "rtl/soc/mtimer.sv",
+    "rtl/soc/uart_tx.sv", "rtl/soc/gpio.sv",
     "rtl/soc/soc_top.sv", "sim/cocotb/tb_soc.sv",
 ]
 
@@ -32,16 +33,18 @@ def assemble_firmware(src="fw/hello_irq.s", out="fw/hello_irq.hex"):
     return out_p
 
 
-def main():
-    prog = Path(os.environ.get("PROG", str(assemble_firmware()))).resolve()
-    build_dir = ROOT / "build/cocotb_soc"
-
+def run_config(prog, sync):
+    """Build + run the SoC test with the async (sync=0) or synchronous (sync=1)
+    RAM. The synchronous RAM exercises the CPU's imem/dmem memory-wait."""
+    name = "sync" if sync else "async"
+    build_dir = ROOT / f"build/cocotb_soc_{name}"
     runner = get_runner("icarus")
     runner.build(
         verilog_sources=[str(ROOT / s) for s in RTL],
         hdl_toplevel="tb_soc",
         includes=[str(ROOT / "rtl/common")],
         build_args=["-g2012"],
+        parameters={"SYNC": sync},
         build_dir=str(build_dir),
         always=True,
     )
@@ -51,10 +54,18 @@ def main():
         test_dir=str(ROOT / "sim/cocotb"),
         build_dir=str(build_dir),
         plusargs=[f"+PROG={prog}"],
-        results_xml="results.xml",
+        results_xml=f"results_{name}.xml",
     )
     total, failed = get_results(results)
-    print(f"\ncocotb SoC: {total - failed}/{total} tests passed")
+    print(f"cocotb SoC [{name:>5} RAM]: {total - failed}/{total} tests passed")
+    return failed
+
+
+def main():
+    prog = Path(os.environ.get("PROG", str(assemble_firmware()))).resolve()
+    failed = 0
+    for sync in (0, 1):           # async single-cycle RAM, then synchronous SRAM
+        failed += run_config(prog, sync)
     sys.exit(1 if failed else 0)
 
 

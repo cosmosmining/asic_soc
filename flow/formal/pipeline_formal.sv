@@ -13,9 +13,12 @@ module pipeline_formal (
     always @(posedge clk) rst_done <= 1'b1;
     wire rst_n = rst_done;
 
-    // arbitrary fetched instructions and load data every cycle
+    // arbitrary fetched instructions, load data, and memory readiness every
+    // cycle -- so the proof covers any SRAM latency / stall pattern too.
     (* anyseq *) logic [31:0] imem_rdata;
     (* anyseq *) logic [31:0] dmem_rdata;
+    (* anyseq *) logic        imem_ready;
+    (* anyseq *) logic        dmem_ready;
 
     logic [31:0] imem_addr, dmem_addr, dmem_wdata, dbg_pc, rvfi_pc, rvfi_wdata;
     logic [3:0]  dmem_be;
@@ -24,8 +27,8 @@ module pipeline_formal (
 
     riscv_pipeline dut (
         .clk, .rst_n,
-        .imem_addr, .imem_rdata,
-        .dmem_addr, .dmem_wdata, .dmem_be, .dmem_we, .dmem_rdata,
+        .imem_addr, .imem_rdata, .imem_ready,
+        .dmem_addr, .dmem_wdata, .dmem_be, .dmem_we, .dmem_rdata, .dmem_ready,
         .sw_irq(1'b0), .timer_irq(1'b0), .ext_irq(1'b0),
         .dbg_pc, .rvfi_valid, .rvfi_pc, .rvfi_rd, .rvfi_we, .rvfi_wdata
     );

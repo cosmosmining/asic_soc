@@ -13,7 +13,8 @@
 module soc_chip #(
     parameter int RAM_WORDS = 1024,       // 4 KiB -- tractable for a sky130 harden
     parameter int GPIO_W    = 8,
-    parameter int UART_DIV  = 868         // 50 MHz / 115200 baud
+    parameter int UART_DIV  = 868,        // 50 MHz / 115200 baud
+    parameter int SYNC_MEM  = 1           // 1 = synchronous RAM (compiled SRAM macro)
 ) (
     input  logic              clk,
     input  logic              rst_n,      // async assert, external
@@ -30,7 +31,7 @@ module soc_chip #(
 
     // ---- SoC ---------------------------------------------------------------
     soc_top #(
-        .RAM_WORDS(RAM_WORDS), .UART_DIV(UART_DIV), .GPIO_W(GPIO_W)
+        .RAM_WORDS(RAM_WORDS), .UART_DIV(UART_DIV), .GPIO_W(GPIO_W), .SYNC_MEM(SYNC_MEM)
     ) u_soc (
         .clk, .rst_n(rst_sync_n),
         .gpio_out(gpio_out), .gpio_in(gpio_in),

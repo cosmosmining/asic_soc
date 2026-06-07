@@ -13,13 +13,14 @@ read_verilog -sv -I rtl/common \
     rtl/cpu_riscv/mul_seq.sv \
     rtl/cpu_riscv/riscv_pipeline.sv \
     rtl/soc/soc_ram.sv \
+    rtl/soc/soc_ram_sync.sv \
     rtl/soc/mtimer.sv \
     rtl/soc/uart_tx.sv \
     rtl/soc/gpio.sv \
     rtl/soc/soc_top.sv \
     rtl/soc/soc_chip.sv
 
-blackbox soc_ram                      # RAM is a compiled macro, not std cells
+blackbox soc_ram_sync                 # the compiled SRAM macro (soc_chip SYNC_MEM=1)
 hierarchy -check -top soc_chip
 synth -top soc_chip -flatten
 abc -g AND,OR,XOR,MUX
