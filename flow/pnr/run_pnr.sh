@@ -8,9 +8,18 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
+# DESIGN=soc (default) hardens the full SoC (soc_chip); DESIGN=pipeline hardens
+# just the RV32IM core.
+DESIGN="${DESIGN:-soc}"
+case "$DESIGN" in
+    soc)      CFG="$ROOT/flow/pnr/config_soc.mk" ;;
+    pipeline) CFG="$ROOT/flow/pnr/config.mk" ;;
+    *) echo "unknown DESIGN=$DESIGN (use soc|pipeline)" >&2; exit 2 ;;
+esac
+
 if command -v openroad >/dev/null 2>&1 && [[ -n "${FLOW_HOME:-}" ]]; then
-    echo ">> ORFS place & route (sky130hd, riscv_pipeline)"
-    make -C "$FLOW_HOME" DESIGN_CONFIG="$ROOT/flow/pnr/config.mk"
+    echo ">> ORFS place & route (sky130hd, DESIGN=$DESIGN)"
+    make -C "$FLOW_HOME" DESIGN_CONFIG="$CFG"
     exit $?
 fi
 

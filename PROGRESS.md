@@ -308,7 +308,41 @@ subsystem into the CPU with memory-wait stalls.
 
 ---
 
+## Iteration 11 — full-SoC hardening setup (ORFS-ready)
+
+**Goal (user ask):** harden the full SoC through ORFS, RAM as a macro.
+
+**Changed**
+- `rtl/soc/soc_chip.sv` — chip-level PnR boundary over soc_top: a reset
+  synchroniser (async assert, sync de-assert), a fixed PnR-tractable RAM size,
+  and a narrow pad-friendly port list.
+- `tools/yosys/synth_soc_macro.ys` (`make synth-soc-macro`) — hardening synthesis
+  that blackboxes `soc_ram`, mapping the logic to standard cells with the RAM as a
+  single macro instance: the netlist structure ORFS/OpenLane macro flows consume.
+- `flow/pnr/config_soc.mk` (ORFS) + `flow/sta/soc_chip.sdc` + `run_pnr.sh DESIGN=soc`
+  — wire the host PnR/STA stages for the full SoC.
+- `docs/HARDENING.md` — the plan, both RAM strategies, and the honest gaps.
+- `gpio.sv` made width-clean for any `GPIO_W` (the chip uses 8 GPIOs); lint now
+  tops at `soc_chip`.
+
+**Verify (local):** lint clean (soc_chip); regression both cores PASS; cocotb SoC
+2/2 PASS; `make synth-soc-macro` clean (`check -assert`), **SoC logic ≈ 19.3 k
+cells** with the RAM as a macro instance.
+
+**Honest status** — PnR/STA/DRC/LVS are host stages: no sky130 PDK or OpenROAD in
+this environment (volare/OpenSTA fetch unavailable here), so the GDSII is produced
+on a PDK host (the pipeline's `gds_flow/` is the proven reference). Two RAM paths
+are wired: **A. inline flop RAM** — self-contained, functionally exact, runnable
+as-is on a PDK host, larger die; **B. compiled SRAM macro** (OpenRAM 1rw1r /
+DFFRAM) — smaller die, but a standard SRAM is synchronous-read while `soc_ram` is
+async dual-read, so path B needs a one-cycle core **memory-wait** (registered
+fetch + load stall). That adapter is the one remaining RTL change and is itself
+locally verifiable (regression + cocotb) — the natural next iteration.
+
+---
+
 ## Backlog (ordered)
+0d. ~~Full-SoC hardening setup: soc_chip + macro-blackbox synth + ORFS config~~ ✅ (Iteration 11)
 0. ~~Branch prediction (BTB + 2-bit BHT)~~ ✅ (Iteration 4)
 00b. ~~Integrated SoC (RAM/CLINT/UART/GPIO) + machine interrupts + cocotb~~ ✅ (Iteration 10)
 00c. ~~Open-source flow harness (formal, metrics, regs, CLAUDE.md, agents)~~ ✅ (Iteration 10)

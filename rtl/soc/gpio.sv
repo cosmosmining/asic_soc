@@ -27,7 +27,7 @@ module gpio #(
 
     always_comb begin
         unique case (offs)
-            `GPIO_OUT: rdata = gpio_out;
+            `GPIO_OUT: rdata = 32'(gpio_out);     // zero-extend when W < 32
             `GPIO_IN : rdata = 32'(in_sync);
             default  : rdata = 32'h0;
         endcase

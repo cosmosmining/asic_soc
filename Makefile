@@ -28,7 +28,7 @@ RTL_CORE := rtl/cpu_riscv/regfile.sv rtl/cpu_riscv/csr.sv rtl/cpu_riscv/alu.sv \
 RTL_PIPE := rtl/cpu_riscv/regfile.sv rtl/cpu_riscv/csr.sv rtl/cpu_riscv/alu.sv \
             rtl/cpu_riscv/divider.sv rtl/cpu_riscv/mul_seq.sv rtl/cpu_riscv/riscv_pipeline.sv
 RTL_SOC  := $(RTL_PIPE) rtl/soc/soc_ram.sv rtl/soc/mtimer.sv rtl/soc/uart_tx.sv \
-            rtl/soc/gpio.sv rtl/soc/soc_top.sv
+            rtl/soc/gpio.sv rtl/soc/soc_top.sv rtl/soc/soc_chip.sv
 
 # --- tools -----------------------------------------------------------------
 VERILATOR := verilator
@@ -39,7 +39,8 @@ SEEDS ?= 50
 INSTR ?= 64
 
 .PHONY: all tools lint lint-core lint-pipe lint-soc regs sim sim-pipeline regress \
-        sim-soc formal synth synth-soc synth-sky130 sta pnr drc lvs metrics clean help
+        sim-soc formal synth synth-soc synth-soc-macro synth-sky130 sta pnr drc lvs \
+        metrics clean help
 
 all: lint regress sim-soc formal   ## the CI gate (lint + regression + SoC + formal)
 
@@ -64,8 +65,8 @@ lint-pipe:
 	$(VERILATOR) $(VFLAGS) --top-module riscv_pipeline $(RTL_PIPE)
 
 lint-soc:
-	@echo ">> lint soc_top (full SoC)"
-	$(VERILATOR) $(VFLAGS) --top-module soc_top $(RTL_SOC)
+	@echo ">> lint soc_chip (full SoC + chip wrapper)"
+	$(VERILATOR) $(VFLAGS) --top-module soc_chip $(RTL_SOC)
 
 # --- register generation ---------------------------------------------------
 regs:                       ## PeakRDL: regblock + docs + C header + UVM
@@ -95,6 +96,10 @@ synth:                      ## generic Yosys synth/area (pipeline)
 synth-soc:                  ## generic Yosys synth/area (full SoC)
 	mkdir -p $(BUILD) reports
 	yosys -s tools/yosys/synth_soc.ys 2>&1 | tee reports/synth.log
+
+synth-soc-macro:            ## hardening synth of soc_chip (RAM as a macro)
+	mkdir -p $(BUILD) reports
+	yosys -s tools/yosys/synth_soc_macro.ys 2>&1 | tee reports/synth_macro.log
 
 synth-sky130:               ## map pipeline onto the real sky130 PDK
 	bash tools/scripts/synth_sky130.sh riscv_pipeline

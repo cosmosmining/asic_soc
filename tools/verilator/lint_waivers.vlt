@@ -35,3 +35,12 @@ lint_off -rule UNUSEDSIGNAL -file "*/soc_ram.sv" -match "*'d_addr'*"
 // uart_tx.sv: TXDATA is a byte register; only wdata[7:0] is the character. The
 // upper 24 bits of the 32-bit bus write are intentionally unused.
 lint_off -rule UNUSEDSIGNAL -file "*/uart_tx.sv" -match "*'wdata'*"
+
+// gpio.sv: GPIO is W bits wide; when W < 32 the upper bits of the 32-bit bus
+// write data are intentionally unused (only wdata[W-1:0] drives the outputs).
+lint_off -rule UNUSEDSIGNAL -file "*/gpio.sv" -match "*'wdata'*"
+
+// soc_chip.sv: the chip-level (PnR) boundary deliberately does not route the
+// debug / RVFI observation outputs of soc_top to pads -- they exist for the
+// testbenches, not silicon. Leaving those instance pins open is intentional.
+lint_off -rule PINCONNECTEMPTY -file "*/soc_chip.sv"

@@ -1,0 +1,29 @@
+# synth_soc_macro.ys - hardening-style synthesis of the full SoC.
+#
+# Unlike synth_soc.ys (which keeps the RAM as flops for a quick area check), this
+# blackboxes soc_ram so the top maps to standard-cell LOGIC only and the RAM
+# stays an instance to be filled by a compiled SRAM macro (OpenRAM 1rw1r / DFFRAM)
+# during place & route. This is the netlist structure the ORFS/OpenLane macro
+# flow consumes. Reports the true SoC logic-cell count (CPU + bus + peripherals).
+read_verilog -sv -I rtl/common \
+    rtl/cpu_riscv/regfile.sv \
+    rtl/cpu_riscv/csr.sv \
+    rtl/cpu_riscv/alu.sv \
+    rtl/cpu_riscv/divider.sv \
+    rtl/cpu_riscv/mul_seq.sv \
+    rtl/cpu_riscv/riscv_pipeline.sv \
+    rtl/soc/soc_ram.sv \
+    rtl/soc/mtimer.sv \
+    rtl/soc/uart_tx.sv \
+    rtl/soc/gpio.sv \
+    rtl/soc/soc_top.sv \
+    rtl/soc/soc_chip.sv
+
+blackbox soc_ram                      # RAM is a compiled macro, not std cells
+hierarchy -check -top soc_chip
+synth -top soc_chip -flatten
+abc -g AND,OR,XOR,MUX
+opt -purge
+check -assert
+stat
+write_verilog -noattr build/soc_top_macro_netlist.v
