@@ -10,6 +10,7 @@ __pycache__/
 *.pyc
 sim_build/
 results.xml
+results_*.xml
 reports/*.json
 reports/*.log
 flow/**/*.log
