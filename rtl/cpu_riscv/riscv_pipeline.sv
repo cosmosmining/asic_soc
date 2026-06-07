@@ -23,6 +23,10 @@ module riscv_pipeline #(
     output logic [3:0]      dmem_be,
     output logic            dmem_we,
     input  logic [XLEN-1:0] dmem_rdata,
+    // machine interrupt lines (level, from the platform: CLINT/peripherals)
+    input  logic            sw_irq,
+    input  logic            timer_irq,
+    input  logic            ext_irq,
     output logic [XLEN-1:0] dbg_pc,
     output logic            rvfi_valid,
     output logic [XLEN-1:0] rvfi_pc,
@@ -495,23 +499,40 @@ module riscv_pipeline #(
     wire ex_trap    = ex_valid && trap;
     wire ex_do_mret = ex_valid && ex_is_mret;
 
+    // ------------------------------ asynchronous interrupt entry -------------
+    // Take an enabled+pending machine interrupt on a valid instruction in EX,
+    // *unless* that instruction is already taking a synchronous trap (which has
+    // priority) or a multi-cycle op is in flight (let it finish first, so mepc
+    // semantics stay simple). The interrupted instruction is fully squashed --
+    // not retired, no GPR/mem/CSR side effects -- and re-executes after MRET,
+    // because mepc is latched to its PC.
+    logic            irq_req;
+    logic [XLEN-1:0] irq_cause;
+    wire int_take = irq_req && ex_valid && !trap && !div_stall;
+
     csr #(.XLEN(XLEN)) u_csr (
         .clk, .rst_n,
         .csr_addr(ex_csr_addr), .csr_op(ex_csr_op), .csr_wsrc(csr_wsrc),
-        .csr_we(ex_valid && csr_we_intent),     // module suppresses on csr_illegal
+        .csr_we(ex_valid && csr_we_intent),  // csr suppresses the write on illegal/trap
         .csr_rdata(csr_rdata), .csr_illegal(csr_illegal),
-        .trap(ex_trap), .trap_cause(trap_cause), .trap_epc(ex_pc), .trap_tval(trap_tval),
+        .trap(ex_trap || int_take),
+        .trap_cause(int_take ? irq_cause : trap_cause),
+        .trap_epc(ex_pc),
+        .trap_tval(int_take ? '0 : trap_tval),
         .mret(ex_do_mret),
         .trap_target(csr_trap_target), .mret_target(csr_mret_target),
-        .instret_inc(ex_valid && !div_stall && !ex_trap)   // counts EX-stage retirements
+        .sw_irq(sw_irq), .timer_irq(timer_irq), .ext_irq(ext_irq),
+        .irq_req(irq_req), .irq_cause(irq_cause),
+        .instret_inc(ex_valid && !div_stall && !ex_trap && !int_take) // EX-stage retirements
     );
 
-    // Redirect on: synchronous trap (-> mtvec), MRET (-> mepc), or a branch
-    // mispredict (fetched-next-pc != real-next-pc).
-    assign redirect = ex_trap || ex_do_mret ||
+    // Redirect on: interrupt or synchronous trap (-> mtvec), MRET (-> mepc), or
+    // a branch mispredict (fetched-next-pc != real-next-pc).
+    assign redirect = ex_trap || int_take || ex_do_mret ||
                       (ex_valid && (actual_nextpc != pred_nextpc));
     always_comb begin
         if      (ex_trap)    redirect_pc = csr_trap_target;
+        else if (int_take)   redirect_pc = csr_trap_target;
         else if (ex_do_mret) redirect_pc = csr_mret_target;
         else                 redirect_pc = actual_nextpc;
     end
@@ -559,11 +580,13 @@ module riscv_pipeline #(
             em_reg_write <= 1'b0;
             em_mem_write <= 1'b0;
         end else begin
-            // A trapping instruction still retires (em_valid=1, for RVFI) but its
-            // architectural GPR/memory writes are suppressed.
-            em_valid     <= ex_valid;
-            em_reg_write <= ex_valid && ex_reg_write && !ex_trap;
-            em_mem_write <= ex_valid && ex_mem_write && !ex_trap;
+            // A *synchronous*-trapping instruction still retires (em_valid=1, for
+            // RVFI) with its GPR/memory writes suppressed. An *interrupt* fully
+            // squashes the instruction in EX (em_valid=0) so it re-executes after
+            // the handler returns (mepc points at it).
+            em_valid     <= ex_valid && !int_take;
+            em_reg_write <= ex_valid && ex_reg_write && !ex_trap && !int_take;
+            em_mem_write <= ex_valid && ex_mem_write && !ex_trap && !int_take;
             em_alu_y     <= ex_result;          // CSR read / divide result / ALU
             em_pc4       <= ex_pc + 32'd4;
             em_store_data<= fwd_b;

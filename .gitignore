@@ -6,3 +6,9 @@ build/*.hex
 tools/.venv/
 tools/pdk/
 tools/OpenLane/
+__pycache__/
+*.pyc
+sim_build/
+results.xml
+reports/*.json
+flow/**/*.log

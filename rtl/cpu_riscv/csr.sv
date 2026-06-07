@@ -39,6 +39,13 @@ module csr #(
     output logic [XLEN-1:0] trap_target,   // {mtvec base, 2'b00} (direct mode)
     output logic [XLEN-1:0] mret_target,   // mepc, for the core to redirect to
 
+    // ---- machine interrupt lines (level, from the platform) ----------------
+    input  logic            sw_irq,        // MSIP (software)
+    input  logic            timer_irq,     // MTIP (machine timer, e.g. CLINT)
+    input  logic            ext_irq,       // MEIP (external)
+    output logic            irq_req,        // an enabled interrupt is pending+global-enabled
+    output logic [XLEN-1:0] irq_cause,      // mcause value to latch when taken
+
     // ---- counters ----------------------------------------------------------
     input  logic            instret_inc    // one real instruction retired
 );
@@ -47,6 +54,21 @@ module csr #(
     logic [XLEN-1:0]     mtvec, mscratch, mepc, mcause, mtval;
     logic [XLEN-1:0]     mie;                 // MSIE(3)/MTIE(7)/MEIE(11)
     logic [63:0]         mcycle, minstret;
+
+    // -------------------------------------------------- interrupt pending/req
+    // mip is a read-only view of the external level lines (the platform device
+    // -- CLINT/PLIC -- owns the actual source state). MSIP(3)/MTIP(7)/MEIP(11).
+    wire [XLEN-1:0] mip_v = (XLEN'(ext_irq)   << 11) |
+                            (XLEN'(timer_irq) << 7)  |
+                            (XLEN'(sw_irq)    << 3);
+    wire [XLEN-1:0] pend  = mip_v & mie;           // pending AND locally enabled
+    assign irq_req = mstatus_mie && (|pend);        // ... and globally enabled
+    // Priority (highest first): external, software, timer (RISC-V default order).
+    always_comb begin
+        if      (pend[11]) irq_cause = 32'h8000_000B;   // machine external
+        else if (pend[3])  irq_cause = 32'h8000_0003;   // machine software
+        else               irq_cause = 32'h8000_0007;   // machine timer
+    end
 
     // -------------------------------------------------- CSR read (combinational)
     // mstatus: only MIE(3), MPIE(7), MPP(12:11)=11 are meaningful here.
@@ -64,7 +86,7 @@ module csr #(
             `CSR_MEPC    : csr_rdata = mepc;
             `CSR_MCAUSE  : csr_rdata = mcause;
             `CSR_MTVAL   : csr_rdata = mtval;
-            `CSR_MIP     : csr_rdata = '0;                 // no pending sources
+            `CSR_MIP     : csr_rdata = mip_v;              // live interrupt lines
             `CSR_MCYCLE  : csr_rdata = mcycle[31:0];
             `CSR_MCYCLEH : csr_rdata = mcycle[63:32];
             `CSR_MINSTRET: csr_rdata = minstret[31:0];
@@ -102,7 +124,10 @@ module csr #(
             default: csr_wval = csr_rdata;
         endcase
     end
-    wire do_write = csr_we && !csr_illegal;
+    // A trapping instruction (synchronous exception OR an interrupt squashing
+    // the instruction in EX) must not commit its CSR write -- including the
+    // performance-counter writes below -- so it re-executes cleanly after MRET.
+    wire do_write = csr_we && !csr_illegal && !trap;
 
     // -------------------------------------------------- targets to the core
     assign trap_target = {mtvec[XLEN-1:2], 2'b00};   // direct mode

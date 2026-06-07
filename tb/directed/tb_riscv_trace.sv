@@ -34,16 +34,26 @@ module tb_riscv_trace;
     logic [XLEN-1:0] rvfi_wdata;
 
 `ifdef PIPELINE
+    // The pipeline carries interrupt inputs; this differential test runs with
+    // them masked (irq=0) so behaviour matches the single-cycle golden model.
+    // The interrupt path is exercised separately by the SoC cocotb test.
     riscv_pipeline #(.XLEN(XLEN)) dut (
+        .clk, .rst_n,
+        .imem_addr, .imem_rdata,
+        .dmem_addr, .dmem_wdata, .dmem_be, .dmem_we, .dmem_rdata,
+        .sw_irq(1'b0), .timer_irq(1'b0), .ext_irq(1'b0),
+        .dbg_pc,
+        .rvfi_valid, .rvfi_pc, .rvfi_rd, .rvfi_we, .rvfi_wdata
+    );
 `else
     riscv_core #(.XLEN(XLEN)) dut (
-`endif
         .clk, .rst_n,
         .imem_addr, .imem_rdata,
         .dmem_addr, .dmem_wdata, .dmem_be, .dmem_we, .dmem_rdata,
         .dbg_pc,
         .rvfi_valid, .rvfi_pc, .rvfi_rd, .rvfi_we, .rvfi_wdata
     );
+`endif
 
     // unified word-addressed memory, async read / sync byte-write
     logic [XLEN-1:0] mem [0:WORDS-1];
