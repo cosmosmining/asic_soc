@@ -250,8 +250,68 @@ it is **not** a fully signed-off tapeout.
 
 ---
 
+## Iteration 10 — integrated SoC + interrupts + the full open-source flow
+
+**Goal (user ask):** "design the chip in a more robust way with this flow (try
+the open-source first)." Turn the verified-in-isolation CPU into a real,
+interrupt-capable SoC and realize the complete open-source RTL→GDSII flow as an
+agent-drivable, batch, report-driven harness.
+
+**Changed**
+- **Machine interrupts** (`csr.sv`, `riscv_pipeline.sv`): `mip` wired to real
+  interrupt lines; `int_take` takes an enabled+pending interrupt on a valid EX
+  instruction (sync traps and in-flight mul/div have priority), squashes it, and
+  re-executes after MRET. A trapping instruction no longer commits its CSR write.
+  Single-cycle core ties the new csr ports off → differential regression
+  unchanged on both cores.
+- **SoC** (`rtl/soc/soc_top.sv` + `rtl/common/soc_map.svh`): CPU + single-cycle
+  RAM + CLINT (mtime/mtimecmp/msip) + UART (8N1 serializer) + GPIO (2-flop input
+  sync), address-decoded by 64 KiB page. Standard RISC-V CLINT layout; the timer
+  drives the machine-timer interrupt.
+- **Assembler** (`tools/scripts/rvasm.py`): dependency-free two-pass RV32IM
+  assembler (labels, pseudo-ops, `.asciz`/`.byte`, Zicsr). Self-checks by
+  reproducing the hand-encoded `csr_test.hex` byte-for-byte.
+- **Firmware** (`fw/hello_irq.s`): prints over UART, arms the timer, services 5
+  timer interrupts, halts with a GPIO sentinel.
+- **cocotb SoC TB** (`sim/cocotb/`): UART checked two independent ways (strobe +
+  serial-line decode); interrupt path proven by the handler-published count and
+  the completion sentinel.
+- **Formal** (`flow/formal/`): exhaustive ALU equivalence + pipeline safety BMC.
+- **Flow harness**: per-stage `make` targets, `scripts/metrics.py` → summary.json,
+  PeakRDL register generation, `CLAUDE.md`, a PostToolUse lint hook, /verify-all
+  and /timing-triage commands, rtl-reviewer + dv-debugger subagents, OpenSTA /
+  ORFS / DRC-LVS stage scripts.
+
+**Verify** (all run locally, open-source): lint clean (3 tops); differential
+regression PASS both cores; **cocotb SoC 2/2 PASS** (UART banner + 5 interrupts);
+**formal PASS** — ALU equivalence (exhaustive) and pipeline safety BMC (depth 16);
+full-SoC Yosys synth `check -assert` clean.
+
+**What formal caught / fixed** — the pipeline safety BMC found a **real RTL bug**:
+`mepc` only forced bit 0 to zero, but RV32 IALIGN=32 requires `mepc[1:0]=00`, so
+`csrw mepc,<misaligned>; mret` could fetch a misaligned PC. Fixed both mepc-write
+paths in `csr.sv`; BMC then passes. The directed tests never wrote a misaligned
+mepc, so only formal exposed it. (Writing the ALU property also surfaced the
+classic `>>>`-demoted-to-logical-shift signedness trap — in the property, not the
+RTL.)
+
+**Honest status** — stages 0–9 (lint → formal → synth → metrics) run here on the
+open-source toolchain. STA/PnR/DRC/LVS remain host stages needing the sky130 PDK
+(the pipeline already has a DRC/LVS-clean OpenLane GDSII in `gds_flow/`; the full
+SoC has not been hardened, and post-route timing closure is still open). The
+PeakRDL-generated register block is generated + lint-checked but not yet wired
+into the hand-written, verified peripherals. UVM still needs a commercial sim.
+
+**Next bottleneck** — harden the full `soc_top` through ORFS/OpenLane (RAM as an
+OpenRAM/DFFRAM macro, not flops) and close post-route timing; wire the cache→AXI
+subsystem into the CPU with memory-wait stalls.
+
+---
+
 ## Backlog (ordered)
 0. ~~Branch prediction (BTB + 2-bit BHT)~~ ✅ (Iteration 4)
+00b. ~~Integrated SoC (RAM/CLINT/UART/GPIO) + machine interrupts + cocotb~~ ✅ (Iteration 10)
+00c. ~~Open-source flow harness (formal, metrics, regs, CLAUDE.md, agents)~~ ✅ (Iteration 10)
 00. ~~Physical synth (sky130 area) + UVM env + multi-cycle divider~~ ✅ (Iter 5-7)
 000. ~~Real RTL→GDSII on local Docker (sky130/OpenLane)~~ ✅ (Iter 8)
 1. ~~Golden-trace co-sim harness~~ ✅ (Iteration 2)

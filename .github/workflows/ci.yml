@@ -1,41 +1,62 @@
 name: ci
 
-# Lint + functional regression gate. Runs on every push and PR so no change
-# lands without the differential test suite passing and the RTL linting clean.
+# The open-source gate: lint + differential regression + cocotb SoC test +
+# formal proofs + register generation + SoC synthesis. Every stage returns a
+# real exit code, so nothing lands without the flow passing.
 on:
   push:
   pull_request:
   workflow_dispatch:
 
 jobs:
-  lint-and-regress:
+  gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install EDA tools (Icarus Verilog + Verilator)
+      - name: Install EDA toolchain (Icarus, Verilator, Yosys)
         run: |
           sudo apt-get update
-          sudo apt-get install -y iverilog verilator
-          iverilog -V | head -1
-          verilator --version
+          sudo apt-get install -y iverilog verilator yosys
+          iverilog -V | head -1; verilator --version; yosys --version
 
-      - name: Lint (Verilator -Wall, zero warnings tolerated)
+      - name: Install Python flow tools (cocotb, PeakRDL, z3)
+        run: |
+          pip install --quiet cocotb cocotb-bus z3-solver \
+            peakrdl peakrdl-regblock peakrdl-uvm peakrdl-c-header peakrdl-html
+
+      - name: Install SymbiYosys (formal)
+        run: |
+          git clone --depth 1 https://github.com/YosysHQ/sby.git /tmp/sby
+          sudo make -C /tmp/sby install
+          sby --version | head -1
+
+      - name: Lint (Verilator, 0 warnings)
         run: make lint
+
+      - name: Register generation (PeakRDL)
+        run: make regs
 
       - name: Functional regression (both cores, directed + random)
         run: make regress SEEDS=150 INSTR=80
 
-  # Best-effort generic synthesis: proves the RTL still elaborates to gates and
-  # passes Yosys `check -assert`. Non-blocking (yosys availability varies).
-  synth-check:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Yosys
-        run: sudo apt-get update && sudo apt-get install -y yosys
-      - name: Generic synthesis (pipeline) + area stat
-        run: make synth
+      - name: SoC test (cocotb — UART + machine-timer interrupts)
+        run: make sim-soc
+
+      - name: Formal (ALU equivalence + pipeline safety BMC)
+        run: make formal
+
+      - name: SoC synthesis (Yosys, check -assert)
+        run: make synth-soc
+
+      - name: Metrics summary
+        run: make metrics
+
+      - name: Upload metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flow-summary
+          path: reports/summary.json
+          if-no-files-found: ignore

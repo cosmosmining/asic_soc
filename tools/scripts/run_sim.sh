@@ -11,8 +11,10 @@ BUILD="$ROOT/build"
 mkdir -p "$BUILD"
 
 # Gather sources: all synthesizable RTL, shared TB helpers (tb files NOT named
-# tb_*, e.g. golden models), and the requested TB top.
-RTL_FILES=$(find "$ROOT/rtl" -name '*.sv' | sort)
+# tb_*, e.g. golden models), and the requested TB top. rtl/generated/ (PeakRDL
+# output) is excluded -- it targets synthesis / a commercial sim (UVM macros,
+# unpacked structs) and is not part of the Icarus CPU testbench.
+RTL_FILES=$(find "$ROOT/rtl" -path '*/generated/*' -prune -o -name '*.sv' -print | sort)
 TB_HELPERS=$(find "$ROOT/tb" -path '*/uvm/*' -prune -o -name '*.sv' ! -name 'tb_*' -print | sort)
 TB_FILE=$(find "$ROOT/tb" -name "${TB_TOP}.sv" | head -1)
 
