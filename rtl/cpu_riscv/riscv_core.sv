@@ -319,6 +319,8 @@ module riscv_core #(
         .trap, .trap_cause, .trap_epc(pc), .trap_tval,
         .mret(is_mret),
         .trap_target(csr_trap_target), .mret_target(csr_mret_target),
+        .sw_irq(1'b0), .timer_irq(1'b0), .ext_irq(1'b0),  // no interrupts in the SC core
+        .irq_req(), .irq_cause(),                          // SC core never takes interrupts
         .instret_inc(!trap)                 // single-cycle: one retire/cycle unless trapping
     );
 

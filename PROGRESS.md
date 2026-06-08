@@ -250,8 +250,172 @@ it is **not** a fully signed-off tapeout.
 
 ---
 
+## Iteration 10 — integrated SoC + interrupts + the full open-source flow
+
+**Goal (user ask):** "design the chip in a more robust way with this flow (try
+the open-source first)." Turn the verified-in-isolation CPU into a real,
+interrupt-capable SoC and realize the complete open-source RTL→GDSII flow as an
+agent-drivable, batch, report-driven harness.
+
+**Changed**
+- **Machine interrupts** (`csr.sv`, `riscv_pipeline.sv`): `mip` wired to real
+  interrupt lines; `int_take` takes an enabled+pending interrupt on a valid EX
+  instruction (sync traps and in-flight mul/div have priority), squashes it, and
+  re-executes after MRET. A trapping instruction no longer commits its CSR write.
+  Single-cycle core ties the new csr ports off → differential regression
+  unchanged on both cores.
+- **SoC** (`rtl/soc/soc_top.sv` + `rtl/common/soc_map.svh`): CPU + single-cycle
+  RAM + CLINT (mtime/mtimecmp/msip) + UART (8N1 serializer) + GPIO (2-flop input
+  sync), address-decoded by 64 KiB page. Standard RISC-V CLINT layout; the timer
+  drives the machine-timer interrupt.
+- **Assembler** (`tools/scripts/rvasm.py`): dependency-free two-pass RV32IM
+  assembler (labels, pseudo-ops, `.asciz`/`.byte`, Zicsr). Self-checks by
+  reproducing the hand-encoded `csr_test.hex` byte-for-byte.
+- **Firmware** (`fw/hello_irq.s`): prints over UART, arms the timer, services 5
+  timer interrupts, halts with a GPIO sentinel.
+- **cocotb SoC TB** (`sim/cocotb/`): UART checked two independent ways (strobe +
+  serial-line decode); interrupt path proven by the handler-published count and
+  the completion sentinel.
+- **Formal** (`flow/formal/`): exhaustive ALU equivalence + pipeline safety BMC.
+- **Flow harness**: per-stage `make` targets, `scripts/metrics.py` → summary.json,
+  PeakRDL register generation, `CLAUDE.md`, a PostToolUse lint hook, /verify-all
+  and /timing-triage commands, rtl-reviewer + dv-debugger subagents, OpenSTA /
+  ORFS / DRC-LVS stage scripts.
+
+**Verify** (all run locally, open-source): lint clean (3 tops); differential
+regression PASS both cores; **cocotb SoC 2/2 PASS** (UART banner + 5 interrupts);
+**formal PASS** — ALU equivalence (exhaustive) and pipeline safety BMC (depth 16);
+full-SoC Yosys synth `check -assert` clean.
+
+**What formal caught / fixed** — the pipeline safety BMC found a **real RTL bug**:
+`mepc` only forced bit 0 to zero, but RV32 IALIGN=32 requires `mepc[1:0]=00`, so
+`csrw mepc,<misaligned>; mret` could fetch a misaligned PC. Fixed both mepc-write
+paths in `csr.sv`; BMC then passes. The directed tests never wrote a misaligned
+mepc, so only formal exposed it. (Writing the ALU property also surfaced the
+classic `>>>`-demoted-to-logical-shift signedness trap — in the property, not the
+RTL.)
+
+**Honest status** — stages 0–9 (lint → formal → synth → metrics) run here on the
+open-source toolchain. STA/PnR/DRC/LVS remain host stages needing the sky130 PDK
+(the pipeline already has a DRC/LVS-clean OpenLane GDSII in `gds_flow/`; the full
+SoC has not been hardened, and post-route timing closure is still open). The
+PeakRDL-generated register block is generated + lint-checked but not yet wired
+into the hand-written, verified peripherals. UVM still needs a commercial sim.
+
+**Next bottleneck** — harden the full `soc_top` through ORFS/OpenLane (RAM as an
+OpenRAM/DFFRAM macro, not flops) and close post-route timing; wire the cache→AXI
+subsystem into the CPU with memory-wait stalls.
+
+---
+
+## Iteration 11 — full-SoC hardening setup (ORFS-ready)
+
+**Goal (user ask):** harden the full SoC through ORFS, RAM as a macro.
+
+**Changed**
+- `rtl/soc/soc_chip.sv` — chip-level PnR boundary over soc_top: a reset
+  synchroniser (async assert, sync de-assert), a fixed PnR-tractable RAM size,
+  and a narrow pad-friendly port list.
+- `tools/yosys/synth_soc_macro.ys` (`make synth-soc-macro`) — hardening synthesis
+  that blackboxes `soc_ram`, mapping the logic to standard cells with the RAM as a
+  single macro instance: the netlist structure ORFS/OpenLane macro flows consume.
+- `flow/pnr/config_soc.mk` (ORFS) + `flow/sta/soc_chip.sdc` + `run_pnr.sh DESIGN=soc`
+  — wire the host PnR/STA stages for the full SoC.
+- `docs/HARDENING.md` — the plan, both RAM strategies, and the honest gaps.
+- `gpio.sv` made width-clean for any `GPIO_W` (the chip uses 8 GPIOs); lint now
+  tops at `soc_chip`.
+
+**Verify (local):** lint clean (soc_chip); regression both cores PASS; cocotb SoC
+2/2 PASS; `make synth-soc-macro` clean (`check -assert`), **SoC logic ≈ 19.3 k
+cells** with the RAM as a macro instance.
+
+**Honest status** — PnR/STA/DRC/LVS are host stages: no sky130 PDK or OpenROAD in
+this environment (volare/OpenSTA fetch unavailable here), so the GDSII is produced
+on a PDK host (the pipeline's `gds_flow/` is the proven reference). Two RAM paths
+are wired: **A. inline flop RAM** — self-contained, functionally exact, runnable
+as-is on a PDK host, larger die; **B. compiled SRAM macro** (OpenRAM 1rw1r /
+DFFRAM) — smaller die, but a standard SRAM is synchronous-read while `soc_ram` is
+async dual-read, so path B needs a one-cycle core **memory-wait** (registered
+fetch + load stall). That adapter is the one remaining RTL change and is itself
+locally verifiable (regression + cocotb) — the natural next iteration.
+
+---
+
+## Iteration 12 — synchronous-memory support (compiled-SRAM enabler, path B)
+
+**Goal (user ask):** finish path B — let the SoC use a real compiled SRAM macro
+(synchronous read) instead of flop RAM.
+
+**Changed**
+- `riscv_pipeline.sv`: added `imem_ready`/`dmem_ready` and a memory-wait. `if_wait`
+  (fetch not ready) holds PC and bubbles IF/ID; `mem_wait` (load in MEM, data not
+  ready) freezes pc/de/ex/em and bubbles WB, with **every EX-stage commit effect
+  gated by `!mem_wait`** (redirect, CSR trap/mret/write, minstret, predictor
+  training, interrupt) so a frozen instruction is a perfect no-op until it
+  advances. `mem_wait` has priority over `div_stall`; `redirect` over `mem_wait`.
+- `rtl/soc/soc_ram_sync.sv`: synchronous (registered-read) RAM modelling an
+  OpenRAM 1rw1r / DFFRAM macro, with per-port ready. `soc_top` gains `SYNC_MEM`
+  (generate-selects async `soc_ram` or sync `soc_ram_sync` and routes ready);
+  `soc_chip` defaults to `SYNC_MEM=1`. `make synth-soc-macro` blackboxes
+  `soc_ram_sync` as the macro.
+- Verification: `tb/directed/tb_riscv_sync.sv` + `make sync-regress` (golden-trace
+  vs a synchronous memory); cocotb `make sim-soc` now runs the firmware on BOTH
+  the async and synchronous SoC; the safety BMC drives `imem_ready`/`dmem_ready`
+  free (`anyseq`).
+
+**Verify (local):** the design is a **no-op when ready=1** by construction, so the
+async differential regression stays byte-identical (PASS both cores). New:
+**sync-regress PASS** (directed + random, synchronous memory); **cocotb 2/2 on
+both** async and synchronous SoC (HELLO SOC + 5 timer interrupts through fetch +
+load stalls); **formal safety BMC PASS** now under arbitrary memory latency; lint
+clean. CPI rises (~2x on the naive synchronous RAM) -- the expected throughput
+cost of the stall model; pipelined fetch (1 IPC) is the future optimisation.
+
+**Honest status** — the CPU + SoC now drive a synchronous, macro-compatible RAM,
+verified end to end. The compiled SRAM macro generation (OpenRAM) and the host
+PnR/STA/DRC/LVS still run on a PDK host (no PDK/OpenROAD here); `make pnr
+DESIGN=soc` is wired and ready.
+
+---
+
+## Iteration 13 — pipelined synchronous fetch (1 IPC)
+
+**Goal (user ask):** remove the ~2x CPI cost of the naive synchronous-fetch stall
+model so a compiled-SRAM SoC keeps full throughput.
+
+**Changed**
+- `riscv_pipeline.sv`: a `SYNC_FETCH` parameter selects pipelined registered-read
+  fetch. An F stage registers the PC/prediction alongside the in-flight read and
+  acts as a 1-entry skid buffer; a new `imem_cen` output freezes the SRAM read on
+  a stall so the buffered instruction is preserved (no re-read, no duplicate). On
+  redirect the F-stage validity flushes the extra in-flight instruction (a
+  one-cycle bubble). The IF/ID capture is unified behind `cap_*`, so `SYNC_FETCH=0`
+  (async combinational fetch) is byte-identical to before.
+- `soc_ram_sync.sv`: instruction port gains the `i_en` clock-enable (drops the
+  unused ready). soc_top wires `imem_cen` -> `i_en` and sets `SYNC_FETCH=SYNC_MEM`.
+- **Fixed a real memory-model RAW bug** the pipelined timing exposed: a store
+  then a load to the *same* address back-to-back returned stale data, because the
+  registered-read `ready=(addr stable)` heuristic fired immediately (the store
+  used the same address). Added a one-cycle RAW wait (`!(d_we_q && addr==addr_q)`)
+  in `soc_ram_sync` and both sync testbenches. The stall model had masked it.
+- `tb/directed/tb_riscv_pipefetch.sv` + `make sync-regress` now cover BOTH the
+  stall-model and pipelined-fetch sync paths.
+
+**Verify (local):** async regression byte-identical (`SYNC_FETCH=0`, both cores);
+**sync-regress PASS** in both fetch modes (directed + random); pipelined-fetch
+differential PASS over 80 random seeds; cocotb 2/2 on async + synchronous SoC;
+formal safety BMC PASS; lint clean. **CPI on the loop benchmark: 1.03** (vs ~2x
+for the stall model) -- pipelined fetch is back to ~1 IPC.
+
+---
+
 ## Backlog (ordered)
+0f. ~~Pipelined synchronous fetch (1 IPC) for the compiled-SRAM path~~ ✅ (Iteration 13)
+0e. ~~Synchronous-memory support (memory-wait) for a compiled SRAM macro~~ ✅ (Iteration 12)
+0d. ~~Full-SoC hardening setup: soc_chip + macro-blackbox synth + ORFS config~~ ✅ (Iteration 11)
 0. ~~Branch prediction (BTB + 2-bit BHT)~~ ✅ (Iteration 4)
+00b. ~~Integrated SoC (RAM/CLINT/UART/GPIO) + machine interrupts + cocotb~~ ✅ (Iteration 10)
+00c. ~~Open-source flow harness (formal, metrics, regs, CLAUDE.md, agents)~~ ✅ (Iteration 10)
 00. ~~Physical synth (sky130 area) + UVM env + multi-cycle divider~~ ✅ (Iter 5-7)
 000. ~~Real RTL→GDSII on local Docker (sky130/OpenLane)~~ ✅ (Iter 8)
 1. ~~Golden-trace co-sim harness~~ ✅ (Iteration 2)

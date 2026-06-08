@@ -12,7 +12,9 @@ N_INSTR="${2:-64}"
 BUILD="$ROOT/build"
 mkdir -p "$BUILD"
 
-RTL=$(find "$ROOT/rtl" -name '*.sv' | sort)
+# exclude rtl/generated/ (PeakRDL output: targets synthesis / a commercial sim,
+# not the Icarus CPU testbench).
+RTL=$(find "$ROOT/rtl" -path '*/generated/*' -prune -o -name '*.sv' -print | sort)
 HELP=$(find "$ROOT/tb" -path '*/uvm/*' -prune -o -name '*.sv' ! -name 'tb_*' -print | sort)
 TB="$ROOT/tb/directed/tb_riscv_trace.sv"
 IVFLAGS="-g2012 -gsupported-assertions -I $ROOT/rtl/common"

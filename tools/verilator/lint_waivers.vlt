@@ -19,3 +19,30 @@ lint_off -rule UNUSEDSIGNAL -file "*/divider.sv" -match "*'rem'*"
 // csr.sv: mepc enforces IALIGN=32 by forcing bit 0 of the trapped PC to 0
 // ({trap_epc[XLEN-1:1],1'b0}); trap_epc[0] is intentionally dropped.
 lint_off -rule UNUSEDSIGNAL -file "*/csr.sv" -match "*'trap_epc'*"
+
+// riscv_core.sv (single-cycle): shares the csr block with the pipeline but never
+// takes interrupts, so the csr interrupt-request outputs are intentionally left
+// unconnected. Only the pipeline consumes irq_req/irq_cause.
+lint_off -rule PINCONNECTEMPTY -file "*/riscv_core.sv" -match "*'irq_req'*"
+lint_off -rule PINCONNECTEMPTY -file "*/riscv_core.sv" -match "*'irq_cause'*"
+
+// soc_ram.sv: a word-addressed RAM uses only addr[clog2(WORDS)+1:2]; the byte
+// offset [1:0] and the high address bits above the array are decoded upstream
+// (region select) and intentionally ignored here.
+lint_off -rule UNUSEDSIGNAL -file "*/soc_ram.sv" -match "*'i_addr'*"
+lint_off -rule UNUSEDSIGNAL -file "*/soc_ram.sv" -match "*'d_addr'*"
+lint_off -rule UNUSEDSIGNAL -file "*/soc_ram_sync.sv" -match "*'i_addr'*"
+lint_off -rule UNUSEDSIGNAL -file "*/soc_ram_sync.sv" -match "*'d_addr'*"
+
+// uart_tx.sv: TXDATA is a byte register; only wdata[7:0] is the character. The
+// upper 24 bits of the 32-bit bus write are intentionally unused.
+lint_off -rule UNUSEDSIGNAL -file "*/uart_tx.sv" -match "*'wdata'*"
+
+// gpio.sv: GPIO is W bits wide; when W < 32 the upper bits of the 32-bit bus
+// write data are intentionally unused (only wdata[W-1:0] drives the outputs).
+lint_off -rule UNUSEDSIGNAL -file "*/gpio.sv" -match "*'wdata'*"
+
+// soc_chip.sv: the chip-level (PnR) boundary deliberately does not route the
+// debug / RVFI observation outputs of soc_top to pads -- they exist for the
+// testbenches, not silicon. Leaving those instance pins open is intentional.
+lint_off -rule PINCONNECTEMPTY -file "*/soc_chip.sv"
