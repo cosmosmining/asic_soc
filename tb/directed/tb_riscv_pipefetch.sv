@@ -1,14 +1,14 @@
-// tb_riscv_sync.sv - differential test of the pipeline against a *synchronous*
-// (registered-read) memory with the imem_ready/dmem_ready handshake.
+// tb_riscv_pipefetch.sv - differential test of the PIPELINED synchronous fetch.
 //
-// Same golden-trace check as tb_riscv_trace, but the memory answers one cycle
-// late (like a compiled SRAM), so this exercises the pipeline's memory-wait
-// stalls (if_wait on fetch, mem_wait on load). The golden ISS is timing-
-// independent, so a correct pipeline must retire the identical stream -- only
-// slower. Pipeline only (the single-cycle core uses async memory).
+// Drives riscv_pipeline with SYNC_FETCH=1: a registered-read instruction memory
+// gated by imem_cen (the fetch clock-enable), plus a registered-read data memory
+// with the dmem_ready load handshake. So this stresses BOTH the 1-IPC pipelined
+// fetch (with its one-cycle redirect bubble) and the load memory-wait, checking
+// every retire against the timing-independent golden ISS. Should match the
+// golden stream exactly -- at ~1 IPC fetch instead of the stall model's ~2.
 `timescale 1ns/1ps
 
-module tb_riscv_sync;
+module tb_riscv_pipefetch;
     localparam int    XLEN  = 32;
     localparam int    WORDS = 1024;
     localparam int    AW    = $clog2(WORDS);
@@ -19,30 +19,29 @@ module tb_riscv_sync;
 
     logic [XLEN-1:0] imem_addr, imem_rdata, dmem_addr, dmem_wdata, dmem_rdata;
     logic [3:0]      dmem_be;
-    logic            dmem_we, imem_ready, dmem_ready;
+    logic            dmem_we, imem_cen, dmem_ready;
     logic [XLEN-1:0] dbg_pc;
     logic            rvfi_valid, rvfi_we;
     logic [XLEN-1:0] rvfi_pc, rvfi_wdata;
     logic [4:0]      rvfi_rd;
 
-    riscv_pipeline #(.XLEN(XLEN)) dut (
+    riscv_pipeline #(.XLEN(XLEN), .SYNC_FETCH(1'b1)) dut (
         .clk, .rst_n,
-        .imem_addr, .imem_cen(), .imem_rdata, .imem_ready,
+        .imem_addr, .imem_cen, .imem_rdata, .imem_ready(1'b1),
         .dmem_addr, .dmem_wdata, .dmem_be, .dmem_we, .dmem_rdata, .dmem_ready,
         .sw_irq(1'b0), .timer_irq(1'b0), .ext_irq(1'b0),
         .dbg_pc, .rvfi_valid, .rvfi_pc, .rvfi_rd, .rvfi_we, .rvfi_wdata
     );
 
-    // ---- synchronous unified memory: registered read, sync byte write -------
+    // ---- unified memory: registered fetch (clock-enabled) + registered load --
     logic [XLEN-1:0] mem [0:WORDS-1];
-    logic [XLEN-1:0] iaddr_q, daddr_q;
+    logic [XLEN-1:0] daddr_q;
     logic            dwe_q;
-    initial begin imem_rdata = '0; dmem_rdata = '0; iaddr_q = '1; daddr_q = '1; dwe_q = 0; end
+    initial begin imem_rdata = '0; dmem_rdata = '0; daddr_q = '1; dwe_q = 0; end
 
     always_ff @(posedge clk) begin
-        imem_rdata <= mem[imem_addr[AW+1:2]];   // 1-cycle read latency
+        if (imem_cen) imem_rdata <= mem[imem_addr[AW+1:2]];  // pipelined fetch
         dmem_rdata <= mem[dmem_addr[AW+1:2]];
-        iaddr_q    <= imem_addr;
         daddr_q    <= dmem_addr;
         dwe_q      <= dmem_we;
         if (dmem_we) begin
@@ -52,10 +51,11 @@ module tb_riscv_sync;
             if (dmem_be[3]) mem[dmem_addr[AW+1:2]][31:24] <= dmem_wdata[31:24];
         end
     end
-    // valid once the presented address has been stable a cycle; a store to the
-    // same address last cycle (RAW) forces one more wait (registered-read RAM).
-    assign imem_ready = rst_n && (imem_addr == iaddr_q);
-    assign dmem_ready = rst_n && (dmem_addr == daddr_q) && !(dwe_q && (dmem_addr == daddr_q));
+    // valid once the address has been stable a cycle, but a store to the same
+    // address last cycle (RAW) forces one more wait so the registered read
+    // reflects the write.
+    wire dmem_raw = dwe_q && (dmem_addr == daddr_q);
+    assign dmem_ready = rst_n && (dmem_addr == daddr_q) && !dmem_raw;
 
     integer i;
     string  progfile;
@@ -70,7 +70,6 @@ module tb_riscv_sync;
     riscv_golden #(.XLEN(XLEN), .WORDS(WORDS),
                    .PROG("tb/directed/programs/test_core.hex")) gold ();
 
-    // ----------------------------------------------------- retire comparator
     int idx = 0, errors = 0, cycles = 0;
     initial begin
         rst_n = 0;
@@ -101,16 +100,16 @@ module tb_riscv_sync;
     end
 
     function void report_and_finish();
-        $display("=== golden-trace SYNC-memory test ===");
+        $display("=== golden-trace PIPELINED-FETCH test ===");
         $display("retired %0d/%0d instructions", idx, gold.n_exp);
         if (idx > 0)
             $display("PERF: %0d cycles, %0d retired, CPI=%0.3f",
                      cycles, idx, real'(cycles) / real'(idx));
         if (default_prog && mem[256>>2] !== 32'd74) begin
             errors++;
-            $display("  MISMATCH mem[0x100] = 0x%08x (expected 0x4a)", mem[256>>2]);
+            $display("  MISMATCH mem[0x100] = 0x%08x", mem[256>>2]);
         end
-        if (errors == 0) $display("RESULT: PASS (sync-memory trace matched golden)");
+        if (errors == 0) $display("RESULT: PASS (pipelined-fetch trace matched golden)");
         else             $display("RESULT: FAIL (%0d errors)", errors);
         $finish;
     endfunction

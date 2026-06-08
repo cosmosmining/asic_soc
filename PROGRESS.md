@@ -378,7 +378,39 @@ DESIGN=soc` is wired and ready.
 
 ---
 
+## Iteration 13 — pipelined synchronous fetch (1 IPC)
+
+**Goal (user ask):** remove the ~2x CPI cost of the naive synchronous-fetch stall
+model so a compiled-SRAM SoC keeps full throughput.
+
+**Changed**
+- `riscv_pipeline.sv`: a `SYNC_FETCH` parameter selects pipelined registered-read
+  fetch. An F stage registers the PC/prediction alongside the in-flight read and
+  acts as a 1-entry skid buffer; a new `imem_cen` output freezes the SRAM read on
+  a stall so the buffered instruction is preserved (no re-read, no duplicate). On
+  redirect the F-stage validity flushes the extra in-flight instruction (a
+  one-cycle bubble). The IF/ID capture is unified behind `cap_*`, so `SYNC_FETCH=0`
+  (async combinational fetch) is byte-identical to before.
+- `soc_ram_sync.sv`: instruction port gains the `i_en` clock-enable (drops the
+  unused ready). soc_top wires `imem_cen` -> `i_en` and sets `SYNC_FETCH=SYNC_MEM`.
+- **Fixed a real memory-model RAW bug** the pipelined timing exposed: a store
+  then a load to the *same* address back-to-back returned stale data, because the
+  registered-read `ready=(addr stable)` heuristic fired immediately (the store
+  used the same address). Added a one-cycle RAW wait (`!(d_we_q && addr==addr_q)`)
+  in `soc_ram_sync` and both sync testbenches. The stall model had masked it.
+- `tb/directed/tb_riscv_pipefetch.sv` + `make sync-regress` now cover BOTH the
+  stall-model and pipelined-fetch sync paths.
+
+**Verify (local):** async regression byte-identical (`SYNC_FETCH=0`, both cores);
+**sync-regress PASS** in both fetch modes (directed + random); pipelined-fetch
+differential PASS over 80 random seeds; cocotb 2/2 on async + synchronous SoC;
+formal safety BMC PASS; lint clean. **CPI on the loop benchmark: 1.03** (vs ~2x
+for the stall model) -- pipelined fetch is back to ~1 IPC.
+
+---
+
 ## Backlog (ordered)
+0f. ~~Pipelined synchronous fetch (1 IPC) for the compiled-SRAM path~~ ✅ (Iteration 13)
 0e. ~~Synchronous-memory support (memory-wait) for a compiled SRAM macro~~ ✅ (Iteration 12)
 0d. ~~Full-SoC hardening setup: soc_chip + macro-blackbox synth + ORFS config~~ ✅ (Iteration 11)
 0. ~~Branch prediction (BTB + 2-bit BHT)~~ ✅ (Iteration 4)

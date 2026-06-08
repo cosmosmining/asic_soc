@@ -10,9 +10,10 @@ pass/fail exit code plus a machine-readable summary.
 
 - **CPU**: 5-stage in-order RV32IM pipeline (`rtl/cpu_riscv/riscv_pipeline.sv`) —
   forwarding, load-use stall, BTB+BHT branch prediction, multi-cycle mul/div,
-  machine-mode CSRs/traps, machine interrupts (timer/software/external), **and an
-  `imem_ready`/`dmem_ready` memory-wait** so it can drive a synchronous compiled
-  SRAM (a no-op when ready is tied 1 → the async path is byte-identical).
+  machine-mode CSRs/traps, machine interrupts (timer/software/external), and a
+  memory-wait + optional **pipelined registered-read fetch** (`SYNC_FETCH`) so it
+  drives a synchronous compiled SRAM at ~1 IPC (a no-op when async → the
+  combinational-memory path is byte-identical).
   A single-cycle core (`riscv_core.sv`) is the independent golden reference.
 - **SoC** (`rtl/soc/soc_top.sv`): CPU + single-cycle RAM + CLINT machine timer +
   UART + GPIO, integrated over a combinational address-decoded bus.

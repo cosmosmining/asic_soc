@@ -27,7 +27,7 @@ module pipeline_formal (
 
     riscv_pipeline dut (
         .clk, .rst_n,
-        .imem_addr, .imem_rdata, .imem_ready,
+        .imem_addr, .imem_cen(), .imem_rdata, .imem_ready,
         .dmem_addr, .dmem_wdata, .dmem_be, .dmem_we, .dmem_rdata, .dmem_ready,
         .sw_irq(1'b0), .timer_irq(1'b0), .ext_irq(1'b0),
         .dbg_pc, .rvfi_valid, .rvfi_pc, .rvfi_rd, .rvfi_we, .rvfi_wdata

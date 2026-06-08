@@ -42,10 +42,16 @@ ready), and `soc_top`/`soc_chip` select it with `SYNC_MEM=1`. Harden it via
 placement. A DFFRAM flop-macro is the async alternative (path A), trading area
 for simplicity.
 
+Fetch is **pipelined** (`SYNC_FETCH=1`, the SoC default for `SYNC_MEM=1`): an F
+stage registers the PC/prediction alongside the in-flight read and `imem_cen`
+freezes the SRAM on a stall, so steady-state fetch is **~1 IPC** (CPI 1.03 on the
+loop benchmark) -- not the ~2x of a naive per-fetch stall -- at the cost of one
+extra redirect-bubble cycle. The data side keeps the load memory-wait.
+
 The memory-wait is verified: `make sync-regress` runs the differential golden
-trace against a synchronous memory over directed + 100 random programs, and
-`make sim-soc` runs the firmware on both the async and synchronous SoC (the
-synchronous run exercises fetch + load stalls end to end).
+trace against a synchronous memory -- in BOTH fetch modes (stall-model and
+pipelined) -- over directed + random programs, and `make sim-soc` runs the
+firmware on both the async and synchronous SoC end to end.
 
 ## Flow
 
@@ -68,11 +74,12 @@ docker image or via Nix/LibreLane.
   (logic ≈ 19.3 k cells, RAM a single macro instance), `check -assert` clean.
 - ✅ ORFS config + SDC wired for the full SoC; the inline-RAM path is runnable
   on a PDK host with no extra collateral.
-- ✅ Path B's synchronous-read **memory-wait is implemented and verified**
-  (`make sync-regress`: directed + 100 random programs vs the golden ISS;
-  `make sim-soc`: firmware on the synchronous SoC). The async path stays
-  byte-identical (ready tied 1), and the safety BMC now proves PC/data alignment
-  under *arbitrary* memory latency.
+- ✅ Path B's synchronous-read **memory-wait + pipelined fetch are implemented
+  and verified** (`make sync-regress`: both fetch modes vs the golden ISS over
+  directed + random programs; `make sim-soc`: firmware on the synchronous SoC).
+  Pipelined fetch restores ~1 IPC (CPI 1.03 on the loop bench). The async path
+  stays byte-identical (`SYNC_FETCH=0`), and the safety BMC proves PC/data
+  alignment under *arbitrary* memory latency.
 - ⏳ Host stages (PnR/STA/DRC/LVS) not run here — no PDK/OpenROAD in this
   environment. The pipeline's `gds_flow/` is the proven reference; running
   `make pnr DESIGN=soc` on a PDK host produces the SoC GDSII.

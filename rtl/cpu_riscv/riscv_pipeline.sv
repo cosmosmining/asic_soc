@@ -12,13 +12,15 @@
 
 module riscv_pipeline #(
     parameter int XLEN     = 32,
-    parameter logic [XLEN-1:0] RESET_PC = 32'h0000_0000
+    parameter logic [XLEN-1:0] RESET_PC = 32'h0000_0000,
+    parameter bit SYNC_FETCH = 1'b0   // 1 = pipelined registered-read fetch (1 IPC)
 ) (
     input  logic            clk,
     input  logic            rst_n,
     output logic [XLEN-1:0] imem_addr,
+    output logic            imem_cen,     // fetch clock-enable (SYNC_FETCH: hold SRAM on stall)
     input  logic [XLEN-1:0] imem_rdata,
-    input  logic            imem_ready,   // fetched instruction valid this cycle
+    input  logic            imem_ready,   // fetched instruction valid this cycle (SYNC_FETCH=0)
     output logic [XLEN-1:0] dmem_addr,
     output logic [XLEN-1:0] dmem_wdata,
     output logic [3:0]      dmem_be,
@@ -96,6 +98,48 @@ module riscv_pipeline #(
     assign imem_addr = pc;
     assign dbg_pc    = pc;
 
+    // ---- fetch decoupling ---------------------------------------------------
+    // SYNC_FETCH=0 (default): combinational-read memory -- the instruction for
+    // `pc` is on imem_rdata this cycle and captured directly (async, 1 IPC).
+    // SYNC_FETCH=1: a registered-read SRAM answers one cycle late, so a small F
+    // stage registers the PC/prediction alongside the in-flight read and acts as
+    // a 1-entry skid buffer; imem_cen freezes the SRAM read whenever the
+    // front-end stalls, preserving the buffered instruction (no re-read, no
+    // duplicate). Either way IF/ID captures (imem_rdata, cap_*) at 1 IPC -- sync
+    // pays a one-cycle redirect bubble (one extra in-flight stage).
+    wire fetch_en = !(front_stall || mem_wait || if_wait);
+    assign imem_cen = SYNC_FETCH ? fetch_en : 1'b1;
+
+    logic [XLEN-1:0] cap_pc, cap_pred_target;
+    logic            cap_valid, cap_pred_taken;
+    generate
+        if (SYNC_FETCH) begin : g_syncfetch
+            logic            f_valid, f_pred_taken;
+            logic [XLEN-1:0] f_pc, f_pred_target;
+            always_ff @(posedge clk or negedge rst_n) begin
+                if (!rst_n) begin
+                    f_valid <= 1'b0; f_pc <= RESET_PC; f_pred_taken <= 1'b0;
+                end else if (!fetch_en) begin
+                    // hold the F stage in lock-step with the frozen SRAM read
+                end else begin
+                    f_valid       <= !redirect;          // wrong-path fetch -> invalid
+                    f_pc          <= pc;
+                    f_pred_taken  <= predict_taken;
+                    f_pred_target <= predict_target;
+                end
+            end
+            assign cap_valid       = f_valid;
+            assign cap_pc          = f_pc;
+            assign cap_pred_taken  = f_pred_taken;
+            assign cap_pred_target = f_pred_target;
+        end else begin : g_asyncfetch
+            assign cap_valid       = 1'b1;
+            assign cap_pc          = pc;
+            assign cap_pred_taken  = predict_taken;
+            assign cap_pred_target = predict_target;
+        end
+    endgenerate
+
     // ====================================================== IF/ID register
     logic            de_valid;
     logic [XLEN-1:0] de_pc;
@@ -120,11 +164,11 @@ module riscv_pipeline #(
             de_inst       <= 32'h0;
             de_pred_taken <= 1'b0;
         end else begin
-            de_valid       <= 1'b1;
-            de_pc          <= pc;
+            de_valid       <= cap_valid;     // async: 1; sync: F-stage validity
+            de_pc          <= cap_pc;        // async: pc;  sync: the fetched PC
             de_inst        <= imem_rdata;
-            de_pred_taken  <= predict_taken;
-            de_pred_target <= predict_target;
+            de_pred_taken  <= cap_pred_taken;
+            de_pred_target <= cap_pred_target;
         end
     end
 

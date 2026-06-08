@@ -31,6 +31,8 @@ lint_off -rule PINCONNECTEMPTY -file "*/riscv_core.sv" -match "*'irq_cause'*"
 // (region select) and intentionally ignored here.
 lint_off -rule UNUSEDSIGNAL -file "*/soc_ram.sv" -match "*'i_addr'*"
 lint_off -rule UNUSEDSIGNAL -file "*/soc_ram.sv" -match "*'d_addr'*"
+lint_off -rule UNUSEDSIGNAL -file "*/soc_ram_sync.sv" -match "*'i_addr'*"
+lint_off -rule UNUSEDSIGNAL -file "*/soc_ram_sync.sv" -match "*'d_addr'*"
 
 // uart_tx.sv: TXDATA is a byte register; only wdata[7:0] is the character. The
 // upper 24 bits of the 32-bit bus write are intentionally unused.

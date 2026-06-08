@@ -39,7 +39,7 @@ module tb_riscv_trace;
     // The interrupt path is exercised separately by the SoC cocotb test.
     riscv_pipeline #(.XLEN(XLEN)) dut (
         .clk, .rst_n,
-        .imem_addr, .imem_rdata, .imem_ready(1'b1),   // async memory: always ready
+        .imem_addr, .imem_cen(), .imem_rdata, .imem_ready(1'b1),   // async memory: always ready
         .dmem_addr, .dmem_wdata, .dmem_be, .dmem_we, .dmem_rdata, .dmem_ready(1'b1),
         .sw_irq(1'b0), .timer_irq(1'b0), .ext_irq(1'b0),
         .dbg_pc,
